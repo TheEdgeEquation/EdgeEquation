@@ -1,5 +1,6 @@
 import tweepy
 import os
+import sys
 
 try:
     client = tweepy.Client(
@@ -8,9 +9,10 @@ try:
         access_token=os.environ["X_ACCESS_TOKEN"],
         access_token_secret=os.environ["X_ACCESS_SECRET"]
     )
-    me = client.get_me()
-    print(f"Connected to: @{me.data.username}")
-    print(f"Account ID: {me.data.id}")
+    response = client.create_tweet(text="The algorithm doesn't guess. It calculates. Connection test successful. #EdgeEquation")
+    print(f"Tweet posted! ID: {response.data['id']}")
     print("Authentication successful!")
 except Exception as e:
     print(f"Connection failed: {e}")
+    sys.exit(1)
+
