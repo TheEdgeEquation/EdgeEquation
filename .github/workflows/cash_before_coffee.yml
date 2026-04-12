@@ -1,0 +1,88 @@
+name: Cash Before Coffee — Nightly Automation
+
+on:
+  schedule:
+    - cron: "30 1 * * *"
+    - cron: "30 3 * * *"
+    - cron: "0 13 * * *"
+
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "CBC mode to run"
+        required: true
+        default: "cash_tease"
+        type: choice
+        options:
+          - cash_tease
+          - cash_drop
+          - cash_results
+      dry_run:
+        description: "Dry run (no X post)"
+        required: false
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+
+jobs:
+  run-cbc:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Determine CBC mode from schedule
+        id: mode
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "mode=${{ github.event.inputs.mode }}" >> $GITHUB_OUTPUT
+            echo "dry_run=${{ github.event.inputs.dry_run }}" >> $GITHUB_OUTPUT
+          else
+            HOUR=$(date -u +%H)
+            MINUTE=$(date -u +%M)
+            if [ "$HOUR" = "01" ] && [ "$MINUTE" -lt "45" ]; then
+              echo "mode=cash_tease" >> $GITHUB_OUTPUT
+            elif [ "$HOUR" = "03" ] && [ "$MINUTE" -lt "45" ]; then
+              echo "mode=cash_drop" >> $GITHUB_OUTPUT
+            elif [ "$HOUR" = "13" ] && [ "$MINUTE" -lt "15" ]; then
+              echo "mode=cash_results" >> $GITHUB_OUTPUT
+            else
+              echo "mode=cash_tease" >> $GITHUB_OUTPUT
+            fi
+            echo "dry_run=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run Cash Before Coffee
+        env:
+          ODDS_API_KEY:     ${{ secrets.ODDS_API_KEY }}
+          X_API_KEY:        ${{ secrets.X_API_KEY }}
+          X_API_SECRET:     ${{ secrets.X_API_SECRET }}
+          X_ACCESS_TOKEN:   ${{ secrets.X_ACCESS_TOKEN }}
+          X_ACCESS_SECRET:  ${{ secrets.X_ACCESS_SECRET }}
+        run: |
+          DRY_RUN_FLAG=""
+          if [ "${{ steps.mode.outputs.dry_run }}" = "true" ]; then
+            DRY_RUN_FLAG="--dry-run"
+          fi
+          python main.py --mode ${{ steps.mode.outputs.mode }} $DRY_RUN_FLAG
+
+      - name: Upload CBC graphic artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cbc-graphic-${{ steps.mode.outputs.mode }}-${{ github.run_id }}
+          path: output/
+          retention-days: 7
