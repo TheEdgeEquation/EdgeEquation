@@ -147,10 +147,6 @@ def run_cash_tease(dry_run, no_graphic):
     graphic = None
     if not no_graphic:
         try:
-            graphic = generate_cbc_tease_graphic()
-            logger.info(f"Graphic generated: {graphic}")
-        except Exception as e:
-            logger.error(f"Graphic failed: {e}")
     caption = caption_cbc_tease()
     logger.info("Caption ready, posting...")
     if not dry_run:
