@@ -138,4 +138,93 @@ def run_daily(dry_run: bool, no_graphic: bool):
         post_tweet(caption, graphic)
     else:
         logger.info("[DRY RUN] Would post announce")
-                    
+                    def run_cash_tease(dry_run: bool, no_graphic: bool):
+    logger.info("MODE: cash_tease")
+    graphic = None
+    if not no_graphic:
+        try:
+            graphic = generate_cbc_tease_graphic()
+            logger.info(f"Graphic generated: {graphic}")
+        except Exception as e:
+            logger.error(f"Graphic generation failed: {e}")
+            graphic = None
+    caption = caption_cbc_tease()
+    logger.info(f"Caption ready, attempting post...")
+    if not dry_run:
+        result = post_tweet(caption, graphic)
+        logger.info(f"Post result: {result}")
+    else:
+        logger.info("[DRY RUN] Would post CBC tease")
+
+
+def run_cash_drop(dry_run: bool, no_graphic: bool):
+    logger.info("MODE: cash_drop")
+    plays = _fetch_and_grade(style="cbc")
+    if not plays:
+        caption = (
+            "The algo ran the numbers tonight — the edge isn't there.\n\n"
+            "We don't force overnight plays when the model says no.\n"
+            "Back tomorrow night. Cash Before Coffee.\n\n"
+            "#CashBeforeCoffee #NoPlay"
+        )
+        if not dry_run:
+            post_tweet(caption)
+        return
+    graphic = None
+    if not no_graphic:
+        try:
+            graphic = generate_main_graphic(plays, style="cbc")
+        except Exception as e:
+            logger.error(f"Graphic failed: {e}")
+    caption = caption_cbc_drop(plays)
+    if not dry_run:
+        post_tweet(caption, graphic)
+    else:
+        logger.info("[DRY RUN] Would post CBC drop")
+
+
+def run_cash_results(dry_run: bool, no_graphic: bool):
+    logger.info("MODE: cash_results")
+    from datetime import timedelta
+    yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y%m%d")
+    results = load_results(yesterday, style="cbc")
+    if not results:
+        logger.warning("No CBC results for yesterday — skipping")
+        return
+    graphic = None
+    if not no_graphic:
+        try:
+            graphic = generate_results_graphic(results, style="cbc")
+        except Exception as e:
+            logger.error(f"Graphic failed: {e}")
+    caption = caption_cbc_results(results)
+    if not dry_run:
+        post_tweet(caption, graphic)
+    else:
+        logger.info("[DRY RUN] Would post CBC results")
+
+
+MODES = {
+    "announce":     run_announce,
+    "daily":        run_daily,
+    "results":      run_results,
+    "weekly":       run_weekly,
+    "cash_tease":   run_cash_tease,
+    "cash_drop":    run_cash_drop,
+    "cash_results": run_cash_results,
+}
+
+
+def main():
+    parser = argparse.ArgumentParser(description="EdgeEquation + Cash Before Coffee Runner")
+    parser.add_argument("--mode", required=True, choices=list(MODES.keys()))
+    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--no-graphic", action="store_true")
+    args = parser.parse_args()
+    logger.info(f"Starting EdgeEquation | mode={args.mode} | dry_run={args.dry_run}")
+    MODES[args.mode](dry_run=args.dry_run, no_graphic=args.no_graphic)
+    logger.info("Run complete.")
+
+
+if __name__ == "__main__":
+    main()
