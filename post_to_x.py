@@ -47,6 +47,10 @@ def upload_media(image_path: str) -> str | None:
 
 
 def post_tweet(text: str, image_path: str | None = None) -> bool:
+    logger.info(f"X_API_KEY set: {bool(X_API_KEY)}")
+    logger.info(f"X_API_SECRET set: {bool(X_API_SECRET)}")
+    logger.info(f"X_ACCESS_TOKEN set: {bool(X_ACCESS_TOKEN)}")
+    logger.info(f"X_ACCESS_SECRET set: {bool(X_ACCESS_SECRET)}")
     if not all([X_API_KEY, X_API_SECRET, X_ACCESS_TOKEN, X_ACCESS_SECRET]):
         logger.error("X API credentials not set — cannot post")
         return False
