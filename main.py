@@ -219,12 +219,12 @@ MODES = {
 
 
 def main():
-    parser = argparse.ArgumentParser(description="EdgeEquation + Cash Before Coffee Runner")
+    parser = argparse.ArgumentParser(description="EdgeEquation Runner")
     parser.add_argument("--mode", required=True, choices=list(MODES.keys()))
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--no-graphic", action="store_true")
     args = parser.parse_args()
-    logger.info(f"Starting EdgeEquation | mode={args.mode} | dry_run={args.dry_run}")
+    logger.info(f"Starting | mode={args.mode} | dry_run={args.dry_run}")
     MODES[args.mode](dry_run=args.dry_run, no_graphic=args.no_graphic)
     logger.info("Run complete.")
 
