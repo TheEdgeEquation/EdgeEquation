@@ -106,4 +106,5 @@ def build_weekly_stats(style: str = "ee") -> dict:
         "units": units,
         "best_play": best_play or "N/A",
         "worst_play": worst_play or "N/A",
-        "week_label":
+    "week_label": f"{week_start} - {week_end}",
+    }
