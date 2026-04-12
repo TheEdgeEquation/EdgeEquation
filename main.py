@@ -138,7 +138,10 @@ def run_daily(dry_run: bool, no_graphic: bool):
         post_tweet(caption, graphic)
     else:
         logger.info("[DRY RUN] Would post announce")
-                    def run_cash_tease(dry_run: bool, no_graphic: bool):
+logger.info("[DRY RUN] Would post daily plays")
+
+
+ def run_cash_tease(dry_run: bool, no_graphic: bool):
     logger.info("MODE: cash_tease")
     graphic = None
     if not no_graphic:
