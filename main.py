@@ -129,8 +129,6 @@ def run_weekly(dry_run, no_graphic):
         logger.warning("No data for weekly roundup")
         return
     graphic = None
-    if not no_graphic:
-        try:
             graphic = generate_weekly_graphic(stats)
         except Exception as e:
             logger.error(f"Graphic failed: {e}")
