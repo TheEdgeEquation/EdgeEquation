@@ -22,7 +22,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run engine
-        run: python engine/engine/run_engine.py
+        run: python engine/run_engine.py
 
       - name: Commit output
         run: |
