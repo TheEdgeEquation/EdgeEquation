@@ -137,4 +137,5 @@ def run_daily(dry_run: bool, no_graphic: bool):
     if not dry_run:
         post_tweet(caption, graphic)
     else:
-        logger.info("[DRY RUN] Would post announce)
+        logger.info("[DRY RUN] Would post announce")
+                    
