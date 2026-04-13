@@ -17,6 +17,7 @@ on:
         options:
           - announce
           - daily
+          - post
           - results
           - weekly
           - cash_tease
