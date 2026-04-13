@@ -63,4 +63,185 @@ def run_announce(dry_run, no_graphic):
         "Markets: " + sport_str + "\n"
         "Props: Pitcher Ks  •  Player 3s  •  SOG  •  Receptions\n\n"
         "A+/A/A- plays drop at 10:30 AM CDT.\n\n"
-        "Live data. 100% Ver
+        "Live data. 100% Verified. No feelings. Just facts.\n\n"
+        "#EdgeEquation #SportsBetting #PlayerProps"
+    )
+    logger.info("Caption ready")
+    if not dry_run:
+        result = post_tweet(caption, None)
+        logger.info("Post result: " + str(result))
+    else:
+        logger.info("[DRY RUN] Would post announce")
+
+
+def run_daily(dry_run, no_graphic):
+    logger.info("MODE: daily")
+    plays = _fetch_and_grade(style="ee")
+    if not plays:
+        caption = (
+            "No A+/A/A- plays today.\n\n"
+            "The model runs 10,000 sims per line. No edge = no play.\n\n"
+            "Live data. 100% Verified. No feelings. Just facts.\n\n"
+            "#EdgeEquation #NoPlay"
+        )
+        if not dry_run:
+            post_tweet(caption, None)
+        return
+    logger.info("Sending picks via SMS...")
+    sms_result = send_picks_sms(plays)
+    logger.info("SMS result: " + str(sms_result))
+    if dry_run:
+        logger.info("[DRY RUN] SMS preview:\n" + format_picks_for_sms(plays))
+
+
+def run_post(dry_run, no_graphic):
+    logger.info("MODE: post")
+    plays = load_plays(_today(), style="ee")
+    if not plays:
+        logger.warning("No plays found for today")
+        return
+    graphic = None
+    if not no_graphic:
+        try:
+            graphic = generate_main_graphic(plays, style="ee")
+        except Exception as e:
+            logger.error("Graphic failed: " + str(e))
+    caption = caption_daily_ee(plays)
+    if not dry_run:
+        result = post_tweet(caption, graphic)
+        logger.info("Post result: " + str(result))
+    else:
+        logger.info("[DRY RUN] Would post daily plays")
+
+
+def run_results(dry_run, no_graphic):
+    logger.info("MODE: results")
+    results = check_all_results(style="ee", date_str=_today())
+    if not results:
+        logger.warning("No results found today")
+        caption = "Results pending — scores still coming in.\n\n#EdgeEquation #Results"
+        if not dry_run:
+            post_tweet(caption, None)
+        return
+    verified = [r for r in results if r.get("result_checked")]
+    if not verified:
+        logger.warning("No plays verified yet")
+        caption = "Results pending — games still in progress.\n\n#EdgeEquation #Results"
+        if not dry_run:
+            post_tweet(caption, None)
+        return
+    graphic = None
+    if not no_graphic:
+        try:
+            graphic = generate_results_graphic(results, style="ee")
+        except Exception as e:
+            logger.error("Graphic failed: " + str(e))
+    caption = caption_results_ee(results)
+    if not dry_run:
+        result = post_tweet(caption, graphic)
+        logger.info("Post result: " + str(result))
+    else:
+        logger.info("[DRY RUN] Would post results")
+
+
+def run_weekly(dry_run, no_graphic):
+    logger.info("MODE: weekly")
+    stats = build_weekly_stats(style="ee")
+    if stats["total"] == 0:
+        logger.warning("No data for weekly roundup")
+        return
+    graphic = None
+    if not no_graphic:
+        try:
+            graphic = generate_weekly_graphic(stats)
+        except Exception as e:
+            logger.error("Graphic failed: " + str(e))
+    caption = caption_weekly(stats)
+    if not dry_run:
+        result = post_tweet(caption, graphic)
+        logger.info("Post result: " + str(result))
+    else:
+        logger.info("[DRY RUN] Would post weekly")
+        def run_cash_tease(dry_run, no_graphic):
+    logger.info("MODE: cash_tease")
+    caption = caption_cbc_tease()
+    if not dry_run:
+        result = post_tweet(caption, None)
+        logger.info("Post result: " + str(result))
+    else:
+        logger.info("[DRY RUN] Would post CBC tease")
+
+
+def run_cash_drop(dry_run, no_graphic):
+    logger.info("MODE: cash_drop")
+    plays = _fetch_and_grade(style="cbc")
+    if not plays:
+        caption = (
+            "The algo ran tonight — no edge found.\n\n"
+            "We don't force plays. Back tomorrow. Cash Before Coffee.\n\n"
+            "#CashBeforeCoffee #NoPlay"
+        )
+        if not dry_run:
+            post_tweet(caption, None)
+        return
+    graphic = None
+    if not no_graphic:
+        try:
+            graphic = generate_main_graphic(plays, style="cbc")
+        except Exception as e:
+            logger.error("Graphic failed: " + str(e))
+    caption = caption_cbc_drop(plays)
+    if not dry_run:
+        result = post_tweet(caption, graphic)
+        logger.info("Post result: " + str(result))
+    else:
+        logger.info("[DRY RUN] Would post CBC drop")
+
+
+def run_cash_results(dry_run, no_graphic):
+    logger.info("MODE: cash_results")
+    from datetime import timedelta
+    yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y%m%d")
+    results = check_all_results(style="cbc", date_str=yesterday)
+    if not results:
+        logger.warning("No CBC results yesterday")
+        return
+    graphic = None
+    if not no_graphic:
+        try:
+            graphic = generate_results_graphic(results, style="cbc")
+        except Exception as e:
+            logger.error("Graphic failed: " + str(e))
+    caption = caption_cbc_results(results)
+    if not dry_run:
+        result = post_tweet(caption, graphic)
+        logger.info("Post result: " + str(result))
+    else:
+        logger.info("[DRY RUN] Would post CBC results")
+
+
+MODES = {
+    "announce":     run_announce,
+    "daily":        run_daily,
+    "post":         run_post,
+    "results":      run_results,
+    "weekly":       run_weekly,
+    "cash_tease":   run_cash_tease,
+    "cash_drop":    run_cash_drop,
+    "cash_results": run_cash_results,
+}
+
+
+def main():
+    parser = argparse.ArgumentParser(description="EdgeEquation Runner")
+    parser.add_argument("--mode", required=True, choices=list(MODES.keys()))
+    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--no-graphic", action="store_true")
+    args = parser.parse_args()
+    logger.info("Starting | mode=" + args.mode + " | dry_run=" + str(args.dry_run))
+    MODES[args.mode](dry_run=args.dry_run, no_graphic=args.no_graphic)
+    logger.info("Run complete.")
+
+
+if __name__ == "__main__":
+    main()
