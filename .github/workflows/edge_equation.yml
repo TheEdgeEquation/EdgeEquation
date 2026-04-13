@@ -26,7 +26,7 @@ on:
       dry_run:
         description: "Dry run (no X post)"
         required: false
-        default: "true"
+        default: "false"
         type: choice
         options:
           - "true"
@@ -51,12 +51,14 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Determine mode from schedule
-        id: mode
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "mode=${{ github.event.inputs.mode }}" >> $GITHUB_OUTPUT
-            echo "dry_run=${{ github.event.inputs.dry_run }}" >> $GITHUB_OUTPUT
+          if [ "${{ github.event_name }}" == "schedule" ]; then
+            echo "DRY_RUN_FLAG=" >> $GITHUB_ENV
+          elif [ "${{ github.event.inputs.dry_run }}" == "true" ]; then
+            echo "DRY_RUN_FLAG=--dry-run" >> $GITHUB_ENV
           else
+            echo "DRY_RUN_FLAG=" >> $GITHUB_ENV
+          fi
             HOUR=$(date -u +%H)
             MINUTE=$(date -u +%M)
             DOW=$(date -u +%u)
