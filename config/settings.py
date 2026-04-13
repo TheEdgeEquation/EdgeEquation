@@ -12,6 +12,7 @@ X_API_KEY = os.getenv("X_API_KEY", "")
 X_API_SECRET = os.getenv("X_API_SECRET", "")
 X_ACCESS_TOKEN = os.getenv("X_ACCESS_TOKEN", "")
 X_ACCESS_SECRET = os.getenv("X_ACCESS_SECRET", "")
+OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY", "")
 
 # ── Odds API ──────────────────────────────────────────────────────────────────
 ODDS_API_BASE = "https://api.the-odds-api.com/v4"
@@ -46,14 +47,28 @@ SPORT_MARKETS = {
     },
 }
 
+# ── NRFI/YRFI — typical book implied probabilities ───────────────────────────
+# Books typically price NRFI at -130 to -150 (implied 57-60%)
+# We calculate our own probability and compare
+NRFI_TYPICAL_JUICE = -135       # typical book price for NRFI
+YRFI_TYPICAL_JUICE = +115       # typical book price for YRFI
+
+def american_to_implied(odds: int) -> float:
+    if odds > 0:
+        return 100 / (odds + 100)
+    return abs(odds) / (abs(odds) + 100)
+
+NRFI_IMPLIED = american_to_implied(NRFI_TYPICAL_JUICE)
+YRFI_IMPLIED = american_to_implied(YRFI_TYPICAL_JUICE)
+
 # ── Monte Carlo ───────────────────────────────────────────────────────────────
 MC_SIMULATIONS = 10_000
 
-# ── Grade thresholds (edge = simulated_prob - implied_prob) ──────────────────
+# ── Grade thresholds ──────────────────────────────────────────────────────────
 GRADE_THRESHOLDS = [
-    ("A+", 0.08,  91, "Precision Play"),
-    ("A",  0.06,  90, "Sharp Play"),
-    ("A-", 0.04,  88, "Sharp Play"),
+    ("A+", 0.08, 91, "Sigma Play"),
+    ("A",  0.06, 90, "Precision Play"),
+    ("A-", 0.04, 88, "Sharp Play"),
 ]
 
 # ── ESPN CDN logo URL template ────────────────────────────────────────────────
@@ -68,9 +83,9 @@ OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "output")
 
 # ── Graphic dimensions ────────────────────────────────────────────────────────
 GRAPHIC_WIDTH  = 1200
-GRAPHIC_HEIGHT = 675
+GRAPHIC_HEIGHT = 800
 
 # ── Branding ──────────────────────────────────────────────────────────────────
 EE_TAGLINE   = "Live data. 100% Verified. No feelings. Just facts."
-CBC_TAGLINE  = "Cash While You Sleep. ☕"
+CBC_TAGLINE  = "Cash While You Sleep."
 ALGO_VERSION = "ALGORITHM v2.0"
