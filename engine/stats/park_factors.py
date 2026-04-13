@@ -1,10 +1,11 @@
-# stats"""
+# st"""
 engine/stats/park_factors.py
 Static park factors for MLB stadiums.
-K factor > 1.0 means park inflates strikeouts.
-K factor < 1.0 means park suppresses strikeouts.
+K factor above 1.0 means park inflates strikeouts.
+K factor below 1.0 means park suppresses strikeouts.
 Dome = True means weather is irrelevant.
-Altitude in feet — affects pitch movement.
+Altitude in feet affects pitch movement.
+"""
 """
 
 PARK_FACTORS = {
