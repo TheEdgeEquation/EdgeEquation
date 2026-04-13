@@ -202,3 +202,4 @@ def generate_all_analysis(plays, notable_passed=None):
     why_passed = ""
     if notable_passed:
         why_passed = generate_why_we_passed(notable_passed)
+         return analyses, why_passed
