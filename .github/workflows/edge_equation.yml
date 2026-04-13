@@ -6,7 +6,6 @@ on:
     - cron: "30 15 * * *"
     - cron: "30 4 * * *"
     - cron: "0 15 * * 0"
-
   workflow_dispatch:
     inputs:
       mode:
@@ -45,21 +44,34 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: pip
 
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      chedule
+      - name: Determine mode from schedule
         run: |
           EVENT="${{ github.event_name }}"
           DRY="${{ github.event.inputs.dry_run }}"
+          INPUT_MODE="${{ github.event.inputs.mode }}"
           if [ "$EVENT" = "schedule" ]; then
             echo "DRY_RUN_FLAG=" >> $GITHUB_ENV
-          elif [ "$DRY" = "true" ]; then
-            echo "DRY_RUN_FLAG=--dry-run" >> $GITHUB_ENV
+            HOUR=$(date -u +"%H")
+            if [ "$HOUR" = "12" ]; then
+              echo "RUN_MODE=announce" >> $GITHUB_ENV
+            elif [ "$HOUR" = "15" ]; then
+              echo "RUN_MODE=daily" >> $GITHUB_ENV
+            elif [ "$HOUR" = "04" ]; then
+              echo "RUN_MODE=results" >> $GITHUB_ENV
+            else
+              echo "RUN_MODE=daily" >> $GITHUB_ENV
+            fi
           else
-            echo "DRY_RUN_FLAG=" >> $GITHUB_ENV
+            echo "RUN_MODE=$INPUT_MODE" >> $GITHUB_ENV
+            if [ "$DRY" = "true" ]; then
+              echo "DRY_RUN_FLAG=--dry-run" >> $GITHUB_ENV
+            else
+              echo "DRY_RUN_FLAG=" >> $GITHUB_ENV
+            fi
           fi
 
       - name: Run EdgeEquation
@@ -75,16 +87,13 @@ jobs:
           TWILIO_TO:           ${{ secrets.TWILIO_TO }}
           OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
         run: |
-          DRY_RUN_FLAG=""
-          if [ "${{ steps.mode.outputs.dry_run }}" = "true" ]; then
-            DRY_RUN_FLAG="--dry-run"
-          fi
+          echo "Running mode=$RUN_MODE dry=$DRY_RUN_FLAG"
           python main.py --mode $RUN_MODE $DRY_RUN_FLAG
 
       - name: Upload graphic artifact
-        if: always()
         uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: ee-graphic-${{ steps.mode.outputs.mode }}-${{ github.run_id }}
+          name: output-graphic
           path: output/
-          retention-days: 7
+          if-no-files-found: ignore
