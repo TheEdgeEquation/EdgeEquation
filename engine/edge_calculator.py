@@ -1,6 +1,3 @@
-
-Copy
-
 import numpy as np
 import logging
 from config.settings import MC_SIMULATIONS, GRADE_THRESHOLDS, NRFI_IMPLIED, YRFI_IMPLIED
