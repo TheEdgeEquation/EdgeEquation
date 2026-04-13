@@ -22,7 +22,7 @@ ODDS_API_FORMAT = "american"
 # ── Sports & Markets (player props only) ─────────────────────────────────────
 SPORT_MARKETS = {
     "baseball_mlb": {
-        "market": "batter_strikeouts",
+        "market": "pitcher_strikeouts",
         "label": "MLB",
         "prop_label": "Strikeouts",
         "icon": "⚾",
