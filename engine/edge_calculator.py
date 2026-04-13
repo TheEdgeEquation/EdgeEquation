@@ -161,8 +161,10 @@ def calculate_nrfi_plays(style="ee"):
                     commence = game.get("gameDate", "")
                     nrfi_edge = round(nrfi_prob - nrfi_implied, 4)
                     yrfi_edge = round(yrfi_prob - yrfi_implied, 4)
-                    nrfi_grade = grade_nrfi(nrfi_prob, nrfi_implied, both_elite)
-                    yrfi_grade = grade_nrfi(yrfi_prob, yrfi_implied, both_elite)
+                    one_elite = result.get("one_elite", False)
+                    neither_elite = result.get("neither_elite", True)
+                    nrfi_grade = grade_nrfi(nrfi_prob, nrfi_implied, both_elite, one_elite, neither_elite)
+                    yrfi_grade = grade_nrfi(yrfi_prob, yrfi_implied, both_elite, one_elite, neither_elite)
                     if nrfi_grade:
                         grade, score, label = nrfi_grade
                         nrfi_plays.append({"player": away_pitcher + " / " + home_pitcher, "team": home_team, "opponent": away_team, "sport": "baseball_mlb", "sport_label": "MLB", "prop_label": "NRFI", "icon": "⚾", "line": 0.5, "over_odds": nrfi_odds, "under_odds": yrfi_odds, "implied_prob": nrfi_implied, "sim_prob": nrfi_prob, "edge": nrfi_edge, "grade": grade, "confidence_score": score, "play_label": label, "display_line": "NRFI", "display_odds": _format_odds(nrfi_odds), "true_lambda": nrfi_prob, "commence_time": commence, "umpire": umpire_name, "weather": weather.get("condition", ""), "dome": is_dome(home_team)})
