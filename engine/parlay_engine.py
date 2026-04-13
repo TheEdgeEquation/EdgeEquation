@@ -1,7 +1,9 @@
 # engine/parlay_engine.py
-# Edge Equation Parlay Engine - ML, Spreads, and Totals only.
-# Only posts when algorithm finds genuine combined edge.
-# No same-game parlays. Max 3 legs. Min 12% combined edge.
+# Edge Equation Parlay Engine
+# Product 1: ML/Spread/Total parlay (2-3 legs)
+# Product 2: PrizePicks prop parlay (4-6 legs, all markets)
+# Both require minimum 15% combined edge to post.
+# Never forces a play.
 
 import requests
 import logging
@@ -17,16 +19,13 @@ logger = logging.getLogger(__name__)
 MLB_API = "https://statsapi.mlb.com/api/v1"
 CURRENT_YEAR = datetime.now().year
 
-# Minimum edge required per leg
 MIN_LEG_EDGE = 0.04
+MIN_PARLAY_EDGE = 0.15
+MIN_PRIZEPICKS_EDGE = 0.15
+MAX_GAME_PARLAY_LEGS = 3
+MIN_PRIZEPICKS_LEGS = 4
+MAX_PRIZEPICKS_LEGS = 6
 
-# Minimum combined parlay edge to post
-MIN_PARLAY_EDGE = 0.12
-
-# Maximum legs
-MAX_LEGS = 3
-
-# League averages
 LEAGUE_AVG_ERA = 4.25
 LEAGUE_AVG_RUNS = 4.5
 LEAGUE_AVG_TOTAL = 8.5
@@ -38,14 +37,7 @@ def american_to_implied(odds):
     return abs(odds) / (abs(odds) + 100)
 
 
-def implied_to_american(prob):
-    if prob >= 0.5:
-        return round(-prob / (1 - prob) * 100)
-    return round((1 - prob) / prob * 100)
-
-
 def get_todays_games():
-    """Fetch today's MLB schedule with probable pitchers and team stats."""
     try:
         url = f"{MLB_API}/schedule"
         params = {
@@ -68,20 +60,15 @@ def get_todays_games():
                     "home_pitcher": home.get("probablePitcher", {}).get("fullName", ""),
                     "away_pitcher": away.get("probablePitcher", {}).get("fullName", ""),
                     "commence_time": game.get("gameDate", ""),
-                    "venue": game.get("venue", {}).get("name", ""),
                 })
         logger.info("Found " + str(len(games)) + " games today")
         return games
     except Exception as e:
-        logger.error("Failed to fetch today's games: " + str(e))
+        logger.error("Failed to fetch games: " + str(e))
         return []
 
 
-def calculate_team_run_expectancy(team_name, pitcher_name, is_home):
-    """
-    Calculate expected runs for a team in a full game.
-    Uses pitcher ERA, opponent offense, park, weather.
-    """
+def calculate_team_run_expectancy(team_name, pitcher_name):
     try:
         pid = get_pitcher_id(pitcher_name)
         if pid:
@@ -91,79 +78,56 @@ def calculate_team_run_expectancy(team_name, pitcher_name, is_home):
         else:
             pitcher_era = LEAGUE_AVG_ERA
             avg_ip = 5.5
-
-        # Runs allowed by pitcher
-        pitcher_run_rate = pitcher_era / 9
-        pitcher_runs = pitcher_run_rate * avg_ip
-
-        # Bullpen contributes remaining innings at league average
-        bullpen_innings = 9 - avg_ip
-        bullpen_era = 4.20  # league avg bullpen ERA
-        bullpen_runs = (bullpen_era / 9) * bullpen_innings
-
-        total_runs_allowed = round(pitcher_runs + bullpen_runs, 2)
-        return total_runs_allowed
-
+        pitcher_runs = (pitcher_era / 9) * avg_ip
+        bullpen_runs = (4.20 / 9) * (9 - avg_ip)
+        return round(pitcher_runs + bullpen_runs, 2)
     except Exception as e:
         logger.error("Run expectancy failed: " + str(e))
         return LEAGUE_AVG_RUNS
 
 
-def evaluate_game(game):
-    """
-    Evaluate ML, spread, and total edge for a single game.
-    Returns dict of evaluated bets with edges.
-    """
+def _calculate_win_prob(home_runs, away_runs):
+    diff = home_runs - away_runs
+    prob = 1 / (1 + math.exp(-diff * 0.4))
+    prob = min(0.80, max(0.20, prob + 0.04))
+    return round(prob, 4)
+
+
+def evaluate_game_for_parlay(game):
     home_team = game["home_team"]
     away_team = game["away_team"]
     home_pitcher = game["home_pitcher"]
     away_pitcher = game["away_pitcher"]
-
     if not home_pitcher or not away_pitcher:
-        logger.warning("Missing pitcher for " + away_team + " @ " + home_team)
-        return None
+        return []
 
-    # Get adjustments
     weather = get_weather(home_team)
-    weather_adj = weather.get("k_adjustment", 1.0)
     park = get_park_factor(home_team)
     park_k = park.get("k_factor", 1.0)
     dome = park.get("dome", False)
-    umpire_name, umpire_adj = get_umpire_for_game(home_team, away_team)
+    weather_adj = weather.get("k_adjustment", 1.0)
 
-    # Expected runs for each team
-    # Home team offense vs away pitcher
-    home_runs_scored = calculate_team_run_expectancy(away_team, away_pitcher, is_home=False)
-    # Away team offense vs home pitcher
-    away_runs_scored = calculate_team_run_expectancy(home_team, home_pitcher, is_home=True)
+    home_runs = calculate_team_run_expectancy(away_team, away_pitcher)
+    away_runs = calculate_team_run_expectancy(home_team, home_pitcher)
 
-    # Weather and park adjustments on run totals
     if not dome:
-        run_weather_adj = 2.0 - weather_adj  # inverse of K adj
-        home_runs_scored *= run_weather_adj
-        away_runs_scored *= run_weather_adj
+        run_adj = 2.0 - weather_adj
+        home_runs *= run_adj
+        away_runs *= run_adj
 
-    home_runs_scored *= (2.0 - park_k)  # inverse park K = run factor
-    away_runs_scored *= (2.0 - park_k)
+    run_park = 2.0 - park_k
+    home_runs = round(home_runs * run_park, 2)
+    away_runs = round(away_runs * run_park, 2)
 
-    home_runs_scored = round(home_runs_scored, 2)
-    away_runs_scored = round(away_runs_scored, 2)
-
-    expected_total = round(home_runs_scored + away_runs_scored, 2)
-    home_win_prob = _calculate_win_prob(home_runs_scored, away_runs_scored)
+    expected_total = round(home_runs + away_runs, 2)
+    home_win_prob = _calculate_win_prob(home_runs, away_runs)
     away_win_prob = round(1 - home_win_prob, 4)
 
-    logger.info(away_team + " @ " + home_team + ": home_runs=" + str(home_runs_scored) + " away_runs=" + str(away_runs_scored) + " total=" + str(expected_total) + " home_win=" + str(home_win_prob))
+    logger.info(away_team + " @ " + home_team + " exp_total=" + str(expected_total) + " home_win=" + str(home_win_prob))
 
     bets = []
 
-    # Typical book lines for reference
-    # ML: home team typically -130 to -150 favorite
-    # Spread: -1.5 at +130 or +1.5 at -150
-    # Total: typically 8.0 to 9.5
-
-    # Evaluate ML
-    # Book typically prices home team at -130 (implied 56.5%)
+    # ML
     home_ml_implied = 0.565
     away_ml_implied = 0.435
     home_ml_edge = round(home_win_prob - home_ml_implied, 4)
@@ -171,7 +135,7 @@ def evaluate_game(game):
 
     if home_ml_edge >= MIN_LEG_EDGE:
         bets.append({
-            "type": "ML",
+            "type": "ML", "sport": "MLB",
             "pick": home_team + " ML",
             "sim_prob": home_win_prob,
             "implied_prob": home_ml_implied,
@@ -183,7 +147,7 @@ def evaluate_game(game):
 
     if away_ml_edge >= MIN_LEG_EDGE:
         bets.append({
-            "type": "ML",
+            "type": "ML", "sport": "MLB",
             "pick": away_team + " ML",
             "sim_prob": away_win_prob,
             "implied_prob": away_ml_implied,
@@ -193,52 +157,47 @@ def evaluate_game(game):
             "game_id": game["game_id"],
         })
 
-    # Evaluate Total
-    # Book total typically set near league average 8.5
+    # Total
     book_total = 8.5
-    over_implied = 0.50
-    under_implied = 0.50
-
     if expected_total > book_total:
-        over_prob = min(0.70, 0.50 + (expected_total - book_total) * 0.08)
-        over_edge = round(over_prob - over_implied, 4)
+        over_prob = min(0.68, 0.50 + (expected_total - book_total) * 0.08)
+        over_edge = round(over_prob - 0.50, 4)
         if over_edge >= MIN_LEG_EDGE:
             bets.append({
-                "type": "TOTAL",
+                "type": "TOTAL", "sport": "MLB",
                 "pick": "OVER " + str(book_total),
                 "sim_prob": over_prob,
-                "implied_prob": over_implied,
+                "implied_prob": 0.50,
                 "edge": over_edge,
                 "display_odds": "-110",
                 "game": away_team + " @ " + home_team,
                 "game_id": game["game_id"],
             })
     else:
-        under_prob = min(0.70, 0.50 + (book_total - expected_total) * 0.08)
-        under_edge = round(under_prob - under_implied, 4)
+        under_prob = min(0.68, 0.50 + (book_total - expected_total) * 0.08)
+        under_edge = round(under_prob - 0.50, 4)
         if under_edge >= MIN_LEG_EDGE:
             bets.append({
-                "type": "TOTAL",
+                "type": "TOTAL", "sport": "MLB",
                 "pick": "UNDER " + str(book_total),
                 "sim_prob": under_prob,
-                "implied_prob": under_implied,
+                "implied_prob": 0.50,
                 "edge": under_edge,
                 "display_odds": "-110",
                 "game": away_team + " @ " + home_team,
                 "game_id": game["game_id"],
             })
 
-    # Evaluate Spread (-1.5 for favorite)
-    run_diff = abs(home_runs_scored - away_runs_scored)
+    # Spread
+    run_diff = abs(home_runs - away_runs)
     if run_diff > 1.5:
-        # Favorite likely to cover -1.5
         cover_prob = min(0.65, 0.45 + (run_diff - 1.5) * 0.06)
-        cover_implied = american_to_implied(130)  # +130 for -1.5
+        cover_implied = american_to_implied(130)
         cover_edge = round(cover_prob - cover_implied, 4)
         if cover_edge >= MIN_LEG_EDGE:
-            favorite = home_team if home_runs_scored < away_runs_scored else away_team
+            favorite = home_team if home_runs < away_runs else away_team
             bets.append({
-                "type": "SPREAD",
+                "type": "SPREAD", "sport": "MLB",
                 "pick": favorite + " -1.5",
                 "sim_prob": cover_prob,
                 "implied_prob": cover_implied,
@@ -248,121 +207,188 @@ def evaluate_game(game):
                 "game_id": game["game_id"],
             })
 
-    return bets if bets else None
+    return bets
 
 
-def _calculate_win_prob(home_runs, away_runs):
+def build_game_parlay():
     """
-    Convert run expectancy to win probability using log5 method.
-    Higher run differential = higher win probability.
-    """
-    diff = home_runs - away_runs
-    # Sigmoid function centered on run differential
-    prob = 1 / (1 + math.exp(-diff * 0.4))
-    # Home field advantage adds ~4%
-    prob = min(0.80, max(0.20, prob + 0.04))
-    return round(prob, 4)
-
-
-def build_edge_parlay():
-    """
-    Find the best 2-3 leg parlay from today's games.
-    Each leg from a different game.
-    Only posts if combined edge exceeds MIN_PARLAY_EDGE.
+    Build 2-3 leg ML/Spread/Total parlay from different games.
+    Only posts if combined edge >= 15%.
     """
     games = get_todays_games()
     if not games:
-        logger.warning("No games found for parlay engine")
         return None
 
-    # Evaluate all games
     all_bets = []
     for game in games:
-        bets = evaluate_game(game)
-        if bets:
-            all_bets.extend(bets)
+        bets = evaluate_game_for_parlay(game)
+        all_bets.extend(bets)
 
     if not all_bets:
-        logger.warning("No individual bets found edge")
+        logger.warning("No game bets with edge found")
         return None
 
-    # Sort by edge descending
     all_bets.sort(key=lambda x: -x["edge"])
+    logger.info("Game parlay pool: " + str(len(all_bets)) + " bets")
 
-    logger.info("Found " + str(len(all_bets)) + " individual bets with edge")
-
-    # Build best parlay - pick top legs from DIFFERENT games
-    parlay_legs = []
+    legs = []
     used_games = set()
 
     for bet in all_bets:
-        if len(parlay_legs) >= MAX_LEGS:
+        if len(legs) >= MAX_GAME_PARLAY_LEGS:
             break
-        game_id = bet["game_id"]
-        if game_id not in used_games:
-            parlay_legs.append(bet)
-            used_games.add(game_id)
+        if bet["game_id"] not in used_games:
+            legs.append(bet)
+            used_games.add(bet["game_id"])
 
-    if len(parlay_legs) < 2:
-        logger.warning("Not enough legs from different games")
+    if len(legs) < 2:
+        logger.warning("Not enough legs for game parlay")
         return None
 
-    # Calculate combined parlay probability
-    parlay_sim_prob = 1.0
-    parlay_implied_prob = 1.0
-    for leg in parlay_legs:
-        parlay_sim_prob *= leg["sim_prob"]
-        parlay_implied_prob *= leg["implied_prob"]
+    sim_prob = 1.0
+    implied_prob = 1.0
+    for leg in legs:
+        sim_prob *= leg["sim_prob"]
+        implied_prob *= leg["implied_prob"]
 
-    parlay_edge = round(parlay_sim_prob - parlay_implied_prob, 4)
+    edge = round(sim_prob - implied_prob, 4)
+    logger.info("Game parlay: " + str(len(legs)) + " legs edge=" + str(edge))
 
-    logger.info("Parlay: " + str(len(parlay_legs)) + " legs, sim=" + str(round(parlay_sim_prob, 4)) + " implied=" + str(round(parlay_implied_prob, 4)) + " edge=" + str(parlay_edge))
-
-    if parlay_edge < MIN_PARLAY_EDGE:
-        logger.info("Parlay edge " + str(parlay_edge) + " below minimum " + str(MIN_PARLAY_EDGE) + " - not posting")
+    if edge < MIN_PARLAY_EDGE:
+        logger.info("Game parlay edge " + str(edge) + " below minimum - not posting")
         return None
 
-    # Grade the parlay
-    if parlay_edge >= 0.20:
+    if edge >= 0.22:
         grade, score = "A+", 91
-    elif parlay_edge >= 0.16:
+    elif edge >= 0.18:
         grade, score = "A", 90
     else:
         grade, score = "A-", 88
 
     return {
-        "legs": parlay_legs,
-        "parlay_sim_prob": round(parlay_sim_prob, 4),
-        "parlay_implied_prob": round(parlay_implied_prob, 4),
-        "parlay_edge": parlay_edge,
+        "type": "game_parlay",
+        "legs": legs,
+        "sim_prob": round(sim_prob, 4),
+        "implied_prob": round(implied_prob, 4),
+        "edge": edge,
         "grade": grade,
         "confidence_score": score,
-        "leg_count": len(parlay_legs),
+        "leg_count": len(legs),
     }
 
 
-def format_parlay_for_sms(parlay):
-    """Format parlay for SMS to be pasted into Copilot."""
-    if not parlay:
+def build_prizepicks_parlay(graded_props):
+    """
+    Build 4-6 leg PrizePicks slip from ALL graded props.
+    Opens to every market the algorithm finds edge in.
+    No two props from same game.
+    Only posts if combined edge >= 15%.
+    """
+    if not graded_props:
         return None
 
+    # All graded props eligible - algorithm is the filter
+    eligible = [p for p in graded_props if p.get("grade") in ("A+", "A", "A-")]
+
+    if len(eligible) < MIN_PRIZEPICKS_LEGS:
+        logger.warning("Not enough eligible props: " + str(len(eligible)))
+        return None
+
+    eligible.sort(key=lambda x: -x.get("edge", 0))
+
+    legs = []
+    used_games = set()
+
+    for prop in eligible:
+        if len(legs) >= MAX_PRIZEPICKS_LEGS:
+            break
+        game_key = prop.get("team", "") + prop.get("opponent", "")
+        if game_key not in used_games:
+            legs.append(prop)
+            used_games.add(game_key)
+
+    if len(legs) < MIN_PRIZEPICKS_LEGS:
+        logger.warning("Not enough legs from different games: " + str(len(legs)))
+        return None
+
+    sim_prob = 1.0
+    implied_prob = 1.0
+    for leg in legs:
+        sim_prob *= leg.get("sim_prob", 0.55)
+        implied_prob *= leg.get("implied_prob", 0.524)
+
+    edge = round(sim_prob - implied_prob, 4)
+    logger.info("PrizePicks: " + str(len(legs)) + " legs edge=" + str(edge))
+
+    if edge < MIN_PRIZEPICKS_EDGE:
+        logger.info("PrizePicks edge " + str(edge) + " below minimum - not posting")
+        return None
+
+    if edge >= 0.08:
+        grade, score = "A+", 91
+    elif edge >= 0.05:
+        grade, score = "A", 90
+    else:
+        grade, score = "A-", 88
+
+    return {
+        "type": "prizepicks",
+        "legs": legs,
+        "sim_prob": round(sim_prob, 4),
+        "implied_prob": round(implied_prob, 4),
+        "edge": edge,
+        "grade": grade,
+        "confidence_score": score,
+        "leg_count": len(legs),
+    }
+
+
+def format_game_parlay_sms(parlay):
+    if not parlay:
+        return None
     lines = [
         "THE EDGE EQUATION — ALGORITHM PARLAY",
         datetime.now().strftime("%B %d") + "  |  ALGORITHM v2.0",
         str(parlay["leg_count"]) + "-LEG PARLAY  |  Grade: " + parlay["grade"] + " (" + str(parlay["confidence_score"]) + ")",
-        "Combined Edge: +" + str(round(parlay["parlay_edge"] * 100, 1)) + "%",
+        "Combined Edge: +" + str(round(parlay["edge"] * 100, 1)) + "%",
+        "ML + SPREADS + TOTALS ONLY",
         "",
     ]
-
     for i, leg in enumerate(parlay["legs"]):
-        lines.append(str(i + 1) + ". " + leg["pick"] + " (" + leg["display_odds"] + ")")
+        lines.append(str(i+1) + ". " + leg["pick"] + " (" + leg["display_odds"] + ")")
         lines.append("   " + leg["game"])
         lines.append("   Edge: +" + str(round(leg["edge"] * 100, 1)) + "%")
-
+        lines.append("")
     lines += [
-        "",
         "Only posts when the math says yes.",
         "10,000 sims. Live data. No feelings. Just facts.",
     ]
+    return "\n".join(lines)
 
+
+def format_prizepicks_sms(parlay):
+    if not parlay:
+        return None
+    lines = [
+        "THE EDGE EQUATION — PRIZEPICKS SLIP",
+        datetime.now().strftime("%B %d") + "  |  ALGORITHM v2.0",
+        str(parlay["leg_count"]) + "-LEG SLIP  |  Grade: " + parlay["grade"] + " (" + str(parlay["confidence_score"]) + ")",
+        "Combined Edge: +" + str(round(parlay["edge"] * 100, 1)) + "%",
+        "",
+    ]
+    for i, leg in enumerate(parlay["legs"]):
+        player = leg.get("player", "")
+        line = leg.get("display_line", "")
+        prop = leg.get("prop_label", "")
+        odds = leg.get("display_odds", "")
+        sport = leg.get("sport_label", "")
+        edge_pct = str(round(leg.get("edge", 0) * 100, 1))
+        lines.append(str(i+1) + ". " + player + " " + line + " " + prop + " (" + odds + ")")
+        lines.append("   " + sport + "  |  Edge: +" + edge_pct + "%")
+        lines.append("")
+    lines += [
+        "Algorithm approved PrizePicks slip.",
+        "Only posts when the equation says yes.",
+        "10,000 sims. Live data. No feelings. Just facts.",
+    ]
     return "\n".join(lines)
