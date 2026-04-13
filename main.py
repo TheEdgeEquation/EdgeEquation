@@ -18,7 +18,7 @@ def _fetch_and_grade(style="ee"):
     props = fetch_all_props()
     logger.info("Fetching NRFI/YRFI plays from MLB API...")
     nrfi_plays = calculate_nrfi_plays(style=style)
-    all_props = props + nrfi_plays
+    all_props = (props or []) + (nrfi_plays or [])
     if not all_props:
         logger.warning("No props returned from any source")
         return []
