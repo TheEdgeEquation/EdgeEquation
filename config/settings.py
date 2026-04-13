@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ── API Keys ──────────────────────────────────────────────────────────────────
-ODDS_API_KEY = os.getenv("ODDS_API_KEY", "7d57ca787d268998f2d9bcc6a5eaa55c")
+ODDS_API_KEY = os.getenv("ODDS_API_KEY", "7d268998f2d9bcc6a5eaa55c")
 X_API_KEY = os.getenv("X_API_KEY", "")
 X_API_SECRET = os.getenv("X_API_SECRET", "")
 X_ACCESS_TOKEN = os.getenv("X_ACCESS_TOKEN", "")
