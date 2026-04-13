@@ -81,6 +81,10 @@ jobs:
           X_API_SECRET:     ${{ secrets.X_API_SECRET }}
           X_ACCESS_TOKEN:   ${{ secrets.X_ACCESS_TOKEN }}
           X_ACCESS_SECRET:  ${{ secrets.X_ACCESS_SECRET }}
+          TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
+          TWILIO_AUTH_TOKEN:  ${{ secrets.TWILIO_AUTH_TOKEN }}
+          TWILIO_FROM:        ${{ secrets.TWILIO_FROM }}
+          TWILIO_TO:          ${{ secrets.TWILIO_TO }}
         run: |
           DRY_RUN_FLAG=""
           if [ "${{ steps.mode.outputs.dry_run }}" = "true" ]; then
