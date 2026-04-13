@@ -15,23 +15,38 @@ from post_to_x import post_tweet, caption_announce, caption_daily_ee, caption_re
 def _today():
     return datetime.now().strftime("%Y%m%d")
 def _fetch_and_grade(style="ee"):
-    logger.info("Fetching props from Odds API...")
-    props = fetch_all_props() or []
-    logger.info("Fetching NRFI/YRFI plays from MLB API...")
-    nrfi_plays = calculate_nrfi_plays(style=style) or []
-    all_props = props + nrfi_plays
-    if not all_props:
-        logger.warning("No props returned from any source")
-        return []
-    logger.info("Running Monte Carlo on " + str(len(props)) + " props...")
-    graded_props = grade_all_props(props) or []
-    all_plays = graded_props + nrfi_plays
-    if not all_plays:
-        logger.warning("No plays met threshold")
-        return []
-    save_plays(all_plays, style)
-    logger.info(str(len(all_plays)) + " total plays saved")
-    return all_plays
+    import time
+    MAX_ATTEMPTS = 4
+    WAIT_MINUTES = 15
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        logger.info("Fetch attempt " + str(attempt) + " of " + str(MAX_ATTEMPTS))
+        props = fetch_all_props() or []
+        logger.info("Fetching NRFI/YRFI plays from MLB API...")
+        nrfi_plays = calculate_nrfi_plays(style=style) or []
+        if props:
+            logger.info("Props found on attempt " + str(attempt) + ": " + str(len(props)) + " props")
+            graded_props = grade_all_props(props) or []
+            all_plays = graded_props + nrfi_plays
+            if all_plays:
+                save_plays(all_plays, style)
+                logger.info(str(len(all_plays)) + " total plays saved (" + str(len(graded_props)) + " props + " + str(len(nrfi_plays)) + " NRFI/YRFI)")
+                return all_plays
+            else:
+                logger.warning("Props found but none met grade threshold")
+        else:
+            logger.warning("No props found on attempt " + str(attempt))
+        if nrfi_plays:
+            logger.info("NRFI/YRFI plays found: " + str(len(nrfi_plays)) + " - saving and continuing")
+            save_plays(nrfi_plays, style)
+        if attempt < MAX_ATTEMPTS:
+            logger.info("Waiting " + str(WAIT_MINUTES) + " minutes before retry...")
+            time.sleep(WAIT_MINUTES * 60)
+    logger.warning("All attempts exhausted - returning NRFI plays only if available")
+    nrfi_only = calculate_nrfi_plays(style=style) or []
+    if nrfi_only:
+        save_plays(nrfi_only, style)
+        return nrfi_only
+    return []
 def _build_announce_games():
     raw = fetch_all_props() or []
     seen = set()
