@@ -1,7 +1,7 @@
 # engine/parlay_engine.py
 # Edge Equation Parlay Engine
 # Product 1: ML/Spread/Total parlay (2-3 legs)
-# Product 2: PrizePicks prop parlay (4-6 legs, all markets)
+# Product 2: PrizePicks prop parlay (4-6 legs, no NRFI/YRFI)
 # Both require minimum 15% combined edge to post.
 # Never forces a play.
 
@@ -19,16 +19,18 @@ logger = logging.getLogger(__name__)
 MLB_API = "https://statsapi.mlb.com/api/v1"
 CURRENT_YEAR = datetime.now().year
 
-MIN_LEG_EDGE = 0.04
+MIN_LEG_EDGE = 0.06
 MIN_PARLAY_EDGE = 0.15
 MIN_PRIZEPICKS_EDGE = 0.15
 MAX_GAME_PARLAY_LEGS = 3
 MIN_PRIZEPICKS_LEGS = 4
 MAX_PRIZEPICKS_LEGS = 6
+MAX_LEG_EDGE = 0.25
 
 LEAGUE_AVG_ERA = 4.25
 LEAGUE_AVG_RUNS = 4.5
 LEAGUE_AVG_TOTAL = 8.5
+EXCLUDED_PROP_LABELS = ("NRFI", "YRFI")
 
 
 def american_to_implied(odds):
@@ -127,13 +129,12 @@ def evaluate_game_for_parlay(game):
 
     bets = []
 
-    # ML
     home_ml_implied = 0.565
     away_ml_implied = 0.435
     home_ml_edge = round(home_win_prob - home_ml_implied, 4)
     away_ml_edge = round(away_win_prob - away_ml_implied, 4)
 
-    if home_ml_edge >= MIN_LEG_EDGE:
+    if MIN_LEG_EDGE <= home_ml_edge <= MAX_LEG_EDGE:
         bets.append({
             "type": "ML", "sport": "MLB",
             "pick": home_team + " ML",
@@ -145,7 +146,7 @@ def evaluate_game_for_parlay(game):
             "game_id": game["game_id"],
         })
 
-    if away_ml_edge >= MIN_LEG_EDGE:
+    if MIN_LEG_EDGE <= away_ml_edge <= MAX_LEG_EDGE:
         bets.append({
             "type": "ML", "sport": "MLB",
             "pick": away_team + " ML",
@@ -157,12 +158,11 @@ def evaluate_game_for_parlay(game):
             "game_id": game["game_id"],
         })
 
-    # Total
     book_total = 8.5
     if expected_total > book_total:
         over_prob = min(0.68, 0.50 + (expected_total - book_total) * 0.08)
         over_edge = round(over_prob - 0.50, 4)
-        if over_edge >= MIN_LEG_EDGE:
+        if MIN_LEG_EDGE <= over_edge <= MAX_LEG_EDGE:
             bets.append({
                 "type": "TOTAL", "sport": "MLB",
                 "pick": "OVER " + str(book_total),
@@ -176,7 +176,7 @@ def evaluate_game_for_parlay(game):
     else:
         under_prob = min(0.68, 0.50 + (book_total - expected_total) * 0.08)
         under_edge = round(under_prob - 0.50, 4)
-        if under_edge >= MIN_LEG_EDGE:
+        if MIN_LEG_EDGE <= under_edge <= MAX_LEG_EDGE:
             bets.append({
                 "type": "TOTAL", "sport": "MLB",
                 "pick": "UNDER " + str(book_total),
@@ -188,13 +188,12 @@ def evaluate_game_for_parlay(game):
                 "game_id": game["game_id"],
             })
 
-    # Spread
     run_diff = abs(home_runs - away_runs)
     if run_diff > 1.5:
         cover_prob = min(0.65, 0.45 + (run_diff - 1.5) * 0.06)
         cover_implied = american_to_implied(130)
         cover_edge = round(cover_prob - cover_implied, 4)
-        if cover_edge >= MIN_LEG_EDGE:
+        if MIN_LEG_EDGE <= cover_edge <= MAX_LEG_EDGE:
             favorite = home_team if home_runs < away_runs else away_team
             bets.append({
                 "type": "SPREAD", "sport": "MLB",
@@ -211,10 +210,6 @@ def evaluate_game_for_parlay(game):
 
 
 def build_game_parlay():
-    """
-    Build 2-3 leg ML/Spread/Total parlay from different games.
-    Only posts if combined edge >= 15%.
-    """
     games = get_todays_games()
     if not games:
         return None
@@ -278,17 +273,15 @@ def build_game_parlay():
 
 
 def build_prizepicks_parlay(graded_props):
-    """
-    Build 4-6 leg PrizePicks slip from ALL graded props.
-    Opens to every market the algorithm finds edge in.
-    No two props from same game.
-    Only posts if combined edge >= 15%.
-    """
     if not graded_props:
         return None
 
-    # All graded props eligible - algorithm is the filter
-    eligible = [p for p in graded_props if p.get("grade") in ("A+", "A", "A-")]
+    eligible = [
+        p for p in graded_props
+        if p.get("grade") in ("A+", "A", "A-")
+        and p.get("prop_label") not in EXCLUDED_PROP_LABELS
+        and MIN_LEG_EDGE <= p.get("edge", 0) <= MAX_LEG_EDGE
+    ]
 
     if len(eligible) < MIN_PRIZEPICKS_LEGS:
         logger.warning("Not enough eligible props: " + str(len(eligible)))
