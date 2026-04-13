@@ -9,9 +9,9 @@ from engine.edge_calculator import grade_all_props, calculate_nrfi_plays
 from engine.data_tracker import save_plays, load_plays, save_results, load_results, build_weekly_stats
 from engine.visualizer import generate_main_graphic, generate_announce_graphic, generate_results_graphic, generate_weekly_graphic, generate_cbc_tease_graphic
 from engine.score_checker import check_all_results
-from engine.sms_sender import send_picks_sms, format_picks_for_sms
+from engine.sms_sender import send_picks_sms, format_picks_for_sms, send_sms
+from engine.parlay_engine import build_game_parlay, build_prizepicks_parlay, format_game_parlay_sms, format_prizepicks_sms
 from post_to_x import post_tweet, caption_announce, caption_daily_ee, caption_results_ee, caption_cbc_tease, caption_cbc_drop, caption_cbc_results, caption_weekly
-from engine.parlay_engine import build_edge_parlay, format_parlay_for_sms
 def _today():
     return datetime.now().strftime("%Y%m%d")
 def _fetch_and_grade(style="ee"):
@@ -33,7 +33,7 @@ def _fetch_and_grade(style="ee"):
     logger.info(str(len(all_plays)) + " total plays saved")
     return all_plays
 def _build_announce_games():
-    raw = fetch_all_props()
+    raw = fetch_all_props() or []
     seen = set()
     games = []
     for p in raw:
@@ -67,30 +67,37 @@ def run_daily(dry_run, no_graphic):
         if not dry_run:
             post_tweet(caption, None)
         return
-    logger.info("Sending picks via SMS...")
+    logger.info("Sending individual picks via SMS...")
     sms_result = send_picks_sms(plays)
     logger.info("SMS result: " + str(sms_result))
-    logger.info("Running parlay engine...")
-    parlay = build_edge_parlay()
-    if parlay:
-        logger.info("EDGE PARLAY FOUND: " + str(parlay["leg_count"]) + " legs, edge=" + str(parlay["parlay_edge"]))
-        parlay_msg = format_parlay_for_sms(parlay)
+    logger.info("Running game parlay engine...")
+    game_parlay = build_game_parlay()
+    if game_parlay:
+        logger.info("GAME PARLAY FOUND: " + str(game_parlay["leg_count"]) + " legs edge=" + str(game_parlay["edge"]))
+        parlay_msg = format_game_parlay_sms(game_parlay)
         if parlay_msg:
-            from engine.sms_sender import send_sms
-            send_sms("PARLAY ALERT:\n\n" + parlay_msg)
-            logger.info("Parlay SMS sent")
+            if not dry_run:
+                send_sms("PARLAY ALERT:\n\n" + parlay_msg)
+                logger.info("Game parlay SMS sent")
+            else:
+                logger.info("[DRY RUN] Game parlay preview:\n" + parlay_msg)
     else:
-        logger.info("No edge parlay today - not posting")
+        logger.info("No edge game parlay today")
+    logger.info("Running PrizePicks engine...")
+    pp_parlay = build_prizepicks_parlay(plays)
+    if pp_parlay:
+        logger.info("PRIZEPICKS SLIP FOUND: " + str(pp_parlay["leg_count"]) + " legs edge=" + str(pp_parlay["edge"]))
+        pp_msg = format_prizepicks_sms(pp_parlay)
+        if pp_msg:
+            if not dry_run:
+                send_sms("PRIZEPICKS SLIP:\n\n" + pp_msg)
+                logger.info("PrizePicks SMS sent")
+            else:
+                logger.info("[DRY RUN] PrizePicks preview:\n" + pp_msg)
+    else:
+        logger.info("No edge PrizePicks slip today")
     if dry_run:
-        logger.info("[DRY RUN] SMS preview:\n" + format_picks_for_sms(plays))
-        if parlay:
-            logger.info("[DRY RUN] Parlay preview:\n" + format_parlay_for_sms(parlay))
-        return
-    logger.info("Sending picks via SMS...")
-    sms_result = send_picks_sms(plays)
-    logger.info("SMS result: " + str(sms_result))
-    if dry_run:
-        logger.info("[DRY RUN] SMS preview:\n" + format_picks_for_sms(plays))
+        logger.info("[DRY RUN] Individual picks preview:\n" + format_picks_for_sms(plays))
 def run_post(dry_run, no_graphic):
     logger.info("MODE: post")
     plays = load_plays(_today(), style="ee")
