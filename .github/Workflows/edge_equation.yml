@@ -1,0 +1,125 @@
+name: Edge Equation — Daily Automation
+ 
+on:
+  schedule:
+    - cron: "30 12 * * *"
+    - cron: "30 15 * * *"
+    - cron: "30 4 * * *"
+    - cron: "0 15 * * 0"
+    - cron: "0 12 * * 1"
+    - cron: "0 12 1 * *"
+    - cron: "0 12 13 5 *"
+    - cron: "0 12 13 6 *"
+    - cron: "0 12 13 7 *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Mode to run"
+        required: true
+        default: "daily"
+        type: choice
+        options:
+          - announce
+          - daily
+          - results
+          - weekly
+          - weekly_reminder
+          - monthly_reminder
+          - phase2
+          - phase3
+          - phase4
+      dry_run:
+        description: "Dry run (no post or email)"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "true"
+          - "false"
+ 
+jobs:
+  run-edge-equation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+ 
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+ 
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+ 
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+ 
+      - name: Determine mode from schedule
+        run: |
+          EVENT="${{ github.event_name }}"
+          DRY="${{ github.event.inputs.dry_run }}"
+          INPUT_MODE="${{ github.event.inputs.mode }}"
+          if [ "$EVENT" = "schedule" ]; then
+            echo "DRY_RUN_FLAG=" >> $GITHUB_ENV
+            HOUR=$(date -u +"%H")
+            MIN=$(date -u +"%M")
+            DAY=$(date -u +"%d")
+            WEEKDAY=$(date -u +"%u")
+            MONTH=$(date -u +"%m")
+            if [ "$HOUR" = "12" ] && [ "$MIN" = "30" ]; then
+              echo "RUN_MODE=announce" >> $GITHUB_ENV
+            elif [ "$HOUR" = "15" ] && [ "$MIN" = "30" ]; then
+              echo "RUN_MODE=daily" >> $GITHUB_ENV
+            elif [ "$HOUR" = "04" ] && [ "$MIN" = "30" ]; then
+              echo "RUN_MODE=results" >> $GITHUB_ENV
+            elif [ "$HOUR" = "15" ] && [ "$MIN" = "00" ] && [ "$WEEKDAY" = "0" ]; then
+              echo "RUN_MODE=weekly" >> $GITHUB_ENV
+            elif [ "$HOUR" = "12" ] && [ "$MIN" = "00" ] && [ "$WEEKDAY" = "1" ]; then
+              echo "RUN_MODE=weekly_reminder" >> $GITHUB_ENV
+            elif [ "$HOUR" = "12" ] && [ "$MIN" = "00" ] && [ "$DAY" = "01" ]; then
+              echo "RUN_MODE=monthly_reminder" >> $GITHUB_ENV
+            elif [ "$MONTH" = "05" ] && [ "$DAY" = "13" ]; then
+              echo "RUN_MODE=phase2" >> $GITHUB_ENV
+            elif [ "$MONTH" = "06" ] && [ "$DAY" = "13" ]; then
+              echo "RUN_MODE=phase3" >> $GITHUB_ENV
+            elif [ "$MONTH" = "07" ] && [ "$DAY" = "13" ]; then
+              echo "RUN_MODE=phase4" >> $GITHUB_ENV
+            else
+              echo "RUN_MODE=daily" >> $GITHUB_ENV
+            fi
+          else
+            echo "RUN_MODE=$INPUT_MODE" >> $GITHUB_ENV
+            if [ "$DRY" = "true" ]; then
+              echo "DRY_RUN_FLAG=--dry-run" >> $GITHUB_ENV
+            else
+              echo "DRY_RUN_FLAG=" >> $GITHUB_ENV
+            fi
+          fi
+ 
+      - name: Run EdgeEquation
+        env:
+          ODDS_API_KEY:        ${{ secrets.ODDS_API_KEY }}
+          X_API_KEY:           ${{ secrets.X_API_KEY }}
+          X_API_SECRET:        ${{ secrets.X_API_SECRET }}
+          X_ACCESS_TOKEN:      ${{ secrets.X_ACCESS_TOKEN }}
+          X_ACCESS_SECRET:     ${{ secrets.X_ACCESS_SECRET }}
+          TWILIO_ACCOUNT_SID:  ${{ secrets.TWILIO_ACCOUNT_SID }}
+          TWILIO_AUTH_TOKEN:   ${{ secrets.TWILIO_AUTH_TOKEN }}
+          TWILIO_FROM:         ${{ secrets.TWILIO_FROM }}
+          TWILIO_TO:           ${{ secrets.TWILIO_TO }}
+          OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
+          EMAIL_FROM:          ${{ secrets.EMAIL_FROM }}
+          EMAIL_TO:            ${{ secrets.EMAIL_TO }}
+          EMAIL_PASSWORD:      ${{ secrets.EMAIL_PASSWORD }}
+          EMAIL_SMTP:          ${{ secrets.EMAIL_SMTP }}
+        run: |
+          echo "Running mode=$RUN_MODE dry=$DRY_RUN_FLAG"
+          python main.py --mode $RUN_MODE $DRY_RUN_FLAG
+ 
+      - name: Upload graphic artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: output-graphic
+          path: output/
+          if-no-files-found: ignore
