@@ -1,5 +1,4 @@
-"""
-engine/edge_calculator.py
+calculator.py
 Sharp MLB strikeout + NRFI/YRFI model.
 Uses real stats, weather, umpire, and park factors.
 Runs 10,000 Poisson Monte Carlo simulations using TRUE lambda.
