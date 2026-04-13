@@ -11,6 +11,7 @@ from engine.visualizer import generate_main_graphic, generate_announce_graphic, 
 from engine.score_checker import check_all_results
 from engine.sms_sender import send_picks_sms, format_picks_for_sms
 from post_to_x import post_tweet, caption_announce, caption_daily_ee, caption_results_ee, caption_cbc_tease, caption_cbc_drop, caption_cbc_results, caption_weekly
+from engine.parlay_engine import build_edge_parlay, format_parlay_for_sms
 def _today():
     return datetime.now().strftime("%Y%m%d")
 def _fetch_and_grade(style="ee"):
@@ -65,6 +66,25 @@ def run_daily(dry_run, no_graphic):
         caption = "No A+/A/A- plays today.\n\nThe model runs 10,000 sims per line. No edge = no play.\n\nLive data. 100% Verified. No feelings. Just facts.\n\n#EdgeEquation #NoPlay"
         if not dry_run:
             post_tweet(caption, None)
+        return
+    logger.info("Sending picks via SMS...")
+    sms_result = send_picks_sms(plays)
+    logger.info("SMS result: " + str(sms_result))
+    logger.info("Running parlay engine...")
+    parlay = build_edge_parlay()
+    if parlay:
+        logger.info("EDGE PARLAY FOUND: " + str(parlay["leg_count"]) + " legs, edge=" + str(parlay["parlay_edge"]))
+        parlay_msg = format_parlay_for_sms(parlay)
+        if parlay_msg:
+            from engine.sms_sender import send_sms
+            send_sms("PARLAY ALERT:\n\n" + parlay_msg)
+            logger.info("Parlay SMS sent")
+    else:
+        logger.info("No edge parlay today - not posting")
+    if dry_run:
+        logger.info("[DRY RUN] SMS preview:\n" + format_picks_for_sms(plays))
+        if parlay:
+            logger.info("[DRY RUN] Parlay preview:\n" + format_parlay_for_sms(parlay))
         return
     logger.info("Sending picks via SMS...")
     sms_result = send_picks_sms(plays)
