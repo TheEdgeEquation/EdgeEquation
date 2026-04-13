@@ -15,21 +15,21 @@ def _today():
     return datetime.now().strftime("%Y%m%d")
 def _fetch_and_grade(style="ee"):
     logger.info("Fetching props from Odds API...")
-    props = fetch_all_props()
+    props = fetch_all_props() or []
     logger.info("Fetching NRFI/YRFI plays from MLB API...")
-    nrfi_plays = calculate_nrfi_plays(style=style)
-    all_props = (props or []) + (nrfi_plays or [])
+    nrfi_plays = calculate_nrfi_plays(style=style) or []
+    all_props = props + nrfi_plays
     if not all_props:
         logger.warning("No props returned from any source")
         return []
     logger.info("Running Monte Carlo on " + str(len(props)) + " props...")
-    graded_props = grade_all_props(props)
+    graded_props = grade_all_props(props) or []
     all_plays = graded_props + nrfi_plays
     if not all_plays:
         logger.warning("No plays met threshold")
         return []
     save_plays(all_plays, style)
-    logger.info(str(len(all_plays)) + " total plays saved (" + str(len(graded_props)) + " props + " + str(len(nrfi_plays)) + " NRFI/YRFI)")
+    logger.info(str(len(all_plays)) + " total plays saved")
     return all_plays
 def _build_announce_games():
     raw = fetch_all_props()
