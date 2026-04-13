@@ -188,34 +188,8 @@ def run_cash_results(dry_run, no_graphic):
         except Exception as e:
             logger.error(f"Graphic failed: {e}")
     caption = caption_cbc_results(results)
-    if not dry_run:
-        result = post_tweet(caption, graphic)
-        logger.info(f"Post result: {result}")
-    else:
-        logger.info("[DRY RUN] Would post CBC results")
-
-
-MODES = {
-    "announce": run_announce,
-    "daily": run_daily,
-    "results": run_results,
-    "weekly": run_weekly,
-    "cash_tease": run_cash_tease,
-    "cash_drop": run_cash_drop,
-    "cash_results": run_cash_results,
-}
-
-
-def main():
-    parser = argparse.ArgumentParser(description="EdgeEquation Runner")
-    parser.add_argument("--mode", required=True, choices=list(MODES.keys()))
+    if 
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--no-graphic", action="store_true")
     args = parser.parse_args()
-    logger.info(f"Starting | mode={args.mode} | dry_run={args.dry_run}")
-    MODES[args.mode](dry_run=args.dry_run, no_graphic=args.no_graphic)
-    logger.info("Run complete.")
-
-
-if __name__ == "__main__":
-    main()
+    logger.info(f"Starting | mode=
