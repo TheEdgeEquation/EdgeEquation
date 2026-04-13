@@ -99,7 +99,7 @@ def calculate_edge(prop: dict) -> dict | None:
 
 def calculate_nrfi_plays(style: str = "ee") -> list[dict]:
     """
-    Fetch today's MLB games, calculate NRFI/YRFI probabilities,
+    # Fetch todays MLB games and calculate NRFI/YRFI probabilities
     compare against typical book lines, and return graded plays.
     """
     try:
