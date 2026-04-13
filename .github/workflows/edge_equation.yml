@@ -50,7 +50,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Determine mode from schedule
+      chedule
         run: |
           EVENT="${{ github.event_name }}"
           DRY="${{ github.event.inputs.dry_run }}"
@@ -79,7 +79,7 @@ jobs:
           if [ "${{ steps.mode.outputs.dry_run }}" = "true" ]; then
             DRY_RUN_FLAG="--dry-run"
           fi
-          python main.py --mode ${{ steps.mode.outputs.mode }} $DRY_RUN_FLAG
+          python main.py --mode $RUN_MODE $DRY_RUN_FLAG
 
       - name: Upload graphic artifact
         if: always()
