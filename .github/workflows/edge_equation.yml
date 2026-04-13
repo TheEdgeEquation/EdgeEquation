@@ -52,28 +52,14 @@ jobs:
 
       - name: Determine mode from schedule
         run: |
-          if [ "${{ github.event_name }}" == "schedule" ]; then
+          EVENT="${{ github.event_name }}"
+          DRY="${{ github.event.inputs.dry_run }}"
+          if [ "$EVENT" = "schedule" ]; then
             echo "DRY_RUN_FLAG=" >> $GITHUB_ENV
-          elif [ "${{ github.event.inputs.dry_run }}" == "true" ]; then
+          elif [ "$DRY" = "true" ]; then
             echo "DRY_RUN_FLAG=--dry-run" >> $GITHUB_ENV
           else
             echo "DRY_RUN_FLAG=" >> $GITHUB_ENV
-          fi
-            HOUR=$(date -u +%H)
-            MINUTE=$(date -u +%M)
-            DOW=$(date -u +%u)
-            if [ "$HOUR" = "12" ] && [ "$MINUTE" -lt "45" ]; then
-              echo "mode=announce" >> $GITHUB_OUTPUT
-            elif [ "$HOUR" = "15" ] && [ "$MINUTE" -lt "45" ] && [ "$DOW" != "7" ]; then
-              echo "mode=daily" >> $GITHUB_OUTPUT
-            elif [ "$HOUR" = "15" ] && [ "$DOW" = "7" ]; then
-              echo "mode=weekly" >> $GITHUB_OUTPUT
-            elif [ "$HOUR" = "04" ] && [ "$MINUTE" -lt "45" ]; then
-              echo "mode=results" >> $GITHUB_OUTPUT
-            else
-              echo "mode=daily" >> $GITHUB_OUTPUT
-            fi
-            echo "dry_run=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Run EdgeEquation
