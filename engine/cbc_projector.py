@@ -15,8 +15,8 @@ LEAGUE_AVG_KBO_RUNS = 5.2
 LEAGUE_AVG_NPB_RUNS = 4.1
  
 # TheSportsDB league IDs (free, no key required)
-TSDB_KBO_ID = 4837
-TSDB_NPB_ID = 4344
+TSDB_KBO_ID = 4830
+TSDB_NPB_ID = 4591
  
  
 def get_epl_projections():
