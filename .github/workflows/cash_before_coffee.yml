@@ -57,23 +57,35 @@ jobs:
           EVENT="${{ github.event_name }}"
           DRY="${{ github.event.inputs.dry_run }}"
           INPUT_MODE="${{ github.event.inputs.mode }}"
+ 
           if [ "$EVENT" = "schedule" ]; then
             echo "DRY_RUN_FLAG=" >> $GITHUB_ENV
             HOUR=$(date -u +"%H")
             MIN=$(date -u +"%M")
-            if [ "$HOUR" = "03" ] && [ "$MIN" = "30" ]; then
+ 
+            # Use hour+minute window matching to handle GitHub cron drift
+            # 03:30 UTC = cbc_announce (window: 03:20–03:55)
+            # 04:00 UTC = cbc_kbo     (window: 03:56–04:20)
+            # 04:30 UTC = cbc_npb     (window: 04:21–04:55)
+            # 11:00 UTC = cbc_epl     (window: 10:45–11:45)
+            # 13:00 UTC = cbc_results  (window: 12:45–13:45)
+ 
+            TOTAL_MIN=$((10#$HOUR * 60 + 10#$MIN))
+ 
+            if [ "$TOTAL_MIN" -ge 200 ] && [ "$TOTAL_MIN" -le 235 ]; then
               echo "RUN_MODE=cbc_announce" >> $GITHUB_ENV
-            elif [ "$HOUR" = "04" ] && [ "$MIN" = "00" ]; then
+            elif [ "$TOTAL_MIN" -ge 236 ] && [ "$TOTAL_MIN" -le 260 ]; then
               echo "RUN_MODE=cbc_kbo" >> $GITHUB_ENV
-            elif [ "$HOUR" = "04" ] && [ "$MIN" = "30" ]; then
+            elif [ "$TOTAL_MIN" -ge 261 ] && [ "$TOTAL_MIN" -le 295 ]; then
               echo "RUN_MODE=cbc_npb" >> $GITHUB_ENV
-            elif [ "$HOUR" = "11" ] && [ "$MIN" = "00" ]; then
+            elif [ "$TOTAL_MIN" -ge 645 ] && [ "$TOTAL_MIN" -le 705 ]; then
               echo "RUN_MODE=cbc_epl" >> $GITHUB_ENV
-            elif [ "$HOUR" = "13" ] && [ "$MIN" = "00" ]; then
+            elif [ "$TOTAL_MIN" -ge 765 ] && [ "$TOTAL_MIN" -le 825 ]; then
               echo "RUN_MODE=cbc_results" >> $GITHUB_ENV
             else
               echo "RUN_MODE=cbc_kbo" >> $GITHUB_ENV
             fi
+ 
           else
             echo "RUN_MODE=$INPUT_MODE" >> $GITHUB_ENV
             if [ "$DRY" = "true" ]; then
@@ -93,6 +105,7 @@ jobs:
           X_API_SECRET:        ${{ secrets.X_API_SECRET }}
           X_ACCESS_TOKEN:      ${{ secrets.X_ACCESS_TOKEN }}
           X_ACCESS_SECRET:     ${{ secrets.X_ACCESS_SECRET }}
+          ODDS_API_KEY:        ${{ secrets.ODDS_API_KEY }}
           EMAIL_FROM:          ${{ secrets.EMAIL_FROM }}
           EMAIL_TO:            ${{ secrets.EMAIL_TO }}
           EMAIL_PASSWORD:      ${{ secrets.EMAIL_PASSWORD }}
