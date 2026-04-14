@@ -59,59 +59,50 @@ def format_picks_section(plays):
         units = play.get("recommended_units", 0.5)
         lines.append("* " + player + " " + dl + " " + prop + " (" + odds + ")  |  " + team + " @ " + opp + "  |  Grade: " + grade + " (" + str(score) + ")  |  " + str(units) + "u")
     n = len(sorted_plays)
-    lines += ["", str(n) + " plays  |  " + str(n) + "u in play", "EV Sims: 10,000  |  Data: Live  |  Verified", "", "Paste into Copilot to generate graphic."]
+    lines += ["", str(n) + " plays  |  EV Sims: 10,000  |  Data: Live  |  Verified"]
     return "\n".join(lines)
  
  
-def format_analysis_section(analyses):
-    if not analyses:
-        return "No analysis available."
-    lines = []
-    for i, item in enumerate(analyses):
-        if i > 0:
-            lines.append("-" * 40)
-        lines.append(item.get("text", ""))
-        lines.append("")
-    return "\n".join(lines)
- 
- 
-def format_parlay_section(parlay):
-    if not parlay:
-        return "No edge game parlay today. Algorithm did not clear the 10% threshold."
-    legs = parlay.get("legs", [])
-    edge = parlay.get("edge", 0)
-    grade = parlay.get("grade", "A-")
-    score = parlay.get("confidence_score", 88)
-    n = parlay.get("leg_count", 0)
-    lines = ["ALGORITHM PARLAY — " + str(n) + " LEGS", "Grade: " + grade + " (" + str(score) + ")  |  Combined Edge: +" + str(round(edge*100, 1)) + "%", "ML + SPREADS + TOTALS ONLY", ""]
-    for i, leg in enumerate(legs):
-        lines.append(str(i+1) + ". " + leg.get("pick", "") + " (" + str(leg.get("display_odds", "")) + ")")
-        lines.append("   " + leg.get("game", "") + "  |  Edge: +" + str(round(leg.get("edge", 0)*100, 1)) + "%")
-        lines.append("")
-    lines += ["Only posts when the math says yes.", "10,000 sims. Live data. No feelings. Just facts."]
-    return "\n".join(lines)
- 
- 
-def format_prizepicks_section(slip):
-    if not slip:
-        return "No edge PrizePicks slip today. Not enough props cleared the threshold."
-    legs = slip.get("legs", [])
-    edge = slip.get("edge", 0)
-    grade = slip.get("grade", "A-")
-    n = slip.get("leg_count", 0)
-    lines = ["PRIZEPICKS SLIP — " + str(n) + " LEGS", "Grade: " + grade + "  |  Combined Edge: +" + str(round(edge*100, 1)) + "%", ""]
-    for i, leg in enumerate(legs):
-        player = leg.get("player", "")
-        dl = leg.get("display_line", "")
-        prop = leg.get("prop_label", "")
-        odds = leg.get("display_odds", "")
-        sport = leg.get("sport_label", "")
-        edge_pct = str(round(leg.get("edge", 0)*100, 1))
-        lines.append(str(i+1) + ". " + player + " " + dl + " " + prop + " (" + odds + ")")
-        lines.append("   " + sport + "  |  Edge: +" + edge_pct + "%")
-        lines.append("")
-    lines += ["Algorithm approved. Only posts when the equation says yes."]
-    return "\n".join(lines)
+def format_projection_sections(mlb_games, mlb_pitchers, nba_games, nhl_games, nrfi_plays):
+    from engine.content_generator import (
+        generate_mlb_projection_post,
+        generate_pitcher_projection_post,
+        generate_nba_projection_post,
+        generate_nhl_projection_post,
+        generate_nrfi_probability_post,
+    )
+    sep = "=" * 50
+    sections = []
+    if mlb_games:
+        sections.append(sep)
+        sections.append("MLB GAME PROJECTIONS (copy/paste to X):")
+        sections.append(sep)
+        sections.append(generate_mlb_projection_post(mlb_games))
+    if mlb_pitchers:
+        sections.append("")
+        sections.append(sep)
+        sections.append("MLB PITCHER PROJECTIONS (copy/paste to X):")
+        sections.append(sep)
+        sections.append(generate_pitcher_projection_post(mlb_pitchers))
+    if nba_games:
+        sections.append("")
+        sections.append(sep)
+        sections.append("NBA PROJECTIONS (copy/paste to X):")
+        sections.append(sep)
+        sections.append(generate_nba_projection_post(nba_games))
+    if nhl_games:
+        sections.append("")
+        sections.append(sep)
+        sections.append("NHL PROJECTIONS (copy/paste to X):")
+        sections.append(sep)
+        sections.append(generate_nhl_projection_post(nhl_games))
+    if nrfi_plays:
+        sections.append("")
+        sections.append(sep)
+        sections.append("NRFI/YRFI PROBABILITIES (copy/paste to X):")
+        sections.append(sep)
+        sections.append(generate_nrfi_probability_post(nrfi_plays))
+    return "\n".join(sections)
  
  
 def format_personal_parlay_section(parlay, kelly_units=0.5):
@@ -132,13 +123,12 @@ def format_bankroll_section(bankroll_summary, all_time_stats):
     losses = all_time_stats.get("losses", 0)
     win_rate = all_time_stats.get("win_rate", 0)
     by_grade = all_time_stats.get("by_grade", {})
-    by_sport = all_time_stats.get("by_sport", {})
     avg_clv = all_time_stats.get("avg_clv", 0)
     prefix = "+" if profit >= 0 else ""
     lines = [
         "BANKROLL UPDATE",
         "Starting: $1,000 (100u)  |  Current: $" + str(round(current*10, 2)) + " (" + str(current) + "u)",
-        "P/L: " + prefix + str(profit) + "u ($" + str(round(profit*10, 2)) + ")  |  ROI: " + prefix + str(roi) + "%",
+        "P/L: " + prefix + str(profit) + "u  |  ROI: " + prefix + str(roi) + "%",
         "Record: " + str(wins) + "-" + str(losses) + " (" + str(win_rate) + "%)",
         "",
         "By grade:",
@@ -147,48 +137,82 @@ def format_bankroll_section(bankroll_summary, all_time_stats):
         g = by_grade.get(grade, {})
         if g.get("total", 0) > 0:
             lines.append("  " + grade + ": " + str(g["wins"]) + "-" + str(g["total"]-g["wins"]) + " (" + str(g["win_rate"]) + "%)")
-    lines.append("")
-    lines.append("By sport:")
-    for sport, data in by_sport.items():
-        if data.get("total", 0) > 0:
-            lines.append("  " + sport + ": " + str(data["wins"]) + "-" + str(data["total"]-data["wins"]) + " (" + str(data["win_rate"]) + "%)")
     if avg_clv != 0:
         lines += ["", "Avg closing line value: +" + str(avg_clv) + "%"]
     return "\n".join(lines)
  
  
-def send_daily_email(plays, analyses, game_parlay, pp_parlay, personal_parlay, personal_pp, bankroll_summary, all_time_stats, todo_text, clv_post=None, why_passed=None):
+def send_daily_email(plays, analyses, game_parlay, pp_parlay, personal_parlay, personal_pp, bankroll_summary, all_time_stats, todo_text, mlb_games=None, mlb_pitchers=None, nba_games=None, nhl_games=None, nrfi_plays=None, clv_post=None, why_passed=None):
     n = len(plays) if plays else 0
-    has_parlay = " + Parlay" if game_parlay else ""
-    has_slip = " + Slip" if pp_parlay else ""
-    subject = "EDGE EQUATION — " + datetime.now().strftime("%B %d") + " | " + str(n) + " Plays" + has_parlay + has_slip
+    date_str = datetime.now().strftime("%B %d")
+    subject = "EDGE EQUATION — " + date_str + " | Projections + " + str(n) + " Personal Plays"
     sep = "=" * 50
-    sections = [
-        todo_text,
-        sep, "SECTION 1 — PICKS (paste into Copilot for graphic)", sep,
-        format_picks_section(plays),
-        "", sep, "SECTION 2 — ANALYSIS (paste to X)", sep,
-        format_analysis_section(analyses),
-        "", sep, "SECTION 3 — ALGORITHM PARLAY (post to X if approved)", sep,
-        format_parlay_section(game_parlay),
-        "", sep, "SECTION 4 — PRIZEPICKS SLIP (post to X if approved)", sep,
-        format_prizepicks_section(pp_parlay),
+    body_parts = [todo_text]
+    body_parts += [
+        sep,
+        "SECTION 1 — PUBLIC PROJECTIONS (copy/paste to X)",
+        sep,
+        format_projection_sections(mlb_games or [], mlb_pitchers or [], nba_games or [], nhl_games or [], nrfi_plays or []),
     ]
-    if why_passed:
-        sections += ["", sep, "BONUS — WHY WE PASSED (post to X for engagement)", sep, why_passed]
+    if plays:
+        body_parts += [
+            "",
+            sep,
+            "SECTION 2 — YOUR PERSONAL PICKS (not posted publicly)",
+            sep,
+            format_picks_section(plays),
+        ]
+    if analyses:
+        from engine.analysis_generator import generate_all_analysis
+        body_parts += [
+            "",
+            sep,
+            "SECTION 3 — ANALYSIS TEXT (copy/paste to X after graphic)",
+            sep,
+        ]
+        for item in analyses:
+            body_parts.append(item.get("text", ""))
+            body_parts.append("-" * 40)
+    if game_parlay:
+        from engine.parlay_engine import format_game_parlay_sms
+        body_parts += [
+            "",
+            sep,
+            "SECTION 4 — ALGORITHM PARLAY (post to X if approved)",
+            sep,
+            format_game_parlay_sms(game_parlay) or "No edge parlay today.",
+        ]
+    if pp_parlay:
+        from engine.parlay_engine import format_prizepicks_sms
+        body_parts += [
+            "",
+            sep,
+            "SECTION 5 — PRIZEPICKS SLIP (post to X if approved)",
+            sep,
+            format_prizepicks_sms(pp_parlay) or "No edge slip today.",
+        ]
     if clv_post:
-        sections += ["", sep, "CLV ALERT — POST THIS NOW", sep, clv_post]
+        body_parts += ["", sep, "CLV ALERT — POST THIS NOW", sep, clv_post]
     from engine.kelly_calculator import calculate_parlay_units
     personal_units = calculate_parlay_units(personal_parlay.get("legs", [])) if personal_parlay else 0.5
-    sections += [
-        "", sep, "SECTION 5 — YOUR BEST PARLAY (personal, not posted)", sep,
+    body_parts += [
+        "",
+        sep,
+        "SECTION 6 — YOUR BEST PERSONAL PARLAY (not posted)",
+        sep,
         format_personal_parlay_section(personal_parlay, personal_units),
-        "", sep, "SECTION 6 — YOUR BEST PRIZEPICKS SLIP (personal, not posted)", sep,
+        "",
+        sep,
+        "SECTION 7 — YOUR BEST PRIZEPICKS SLIP (not posted)",
+        sep,
         format_personal_pp_section(personal_pp, 0.5),
-        "", sep, "SECTION 7 — BANKROLL UPDATE", sep,
+        "",
+        sep,
+        "SECTION 8 — BANKROLL UPDATE",
+        sep,
         format_bankroll_section(bankroll_summary, all_time_stats),
     ]
-    body = "\n".join(sections)
+    body = "\n".join(body_parts)
     return _send(subject, body)
  
  
@@ -196,16 +220,7 @@ def send_no_play_email():
     from engine.content_generator import generate_no_play_post
     subject = "EDGE EQUATION — " + datetime.now().strftime("%B %d") + " | No Plays Today"
     no_play = generate_no_play_post()
-    body = "\n".join([
-        "NO PLAYS TODAY",
-        "=" * 40,
-        "",
-        "The algorithm found no edge today.",
-        "",
-        "POST THIS TO X:",
-        "",
-        no_play,
-    ])
+    body = "\n".join(["NO PLAYS TODAY", "=" * 40, "", "POST THIS TO X:", "", no_play])
     return _send(subject, body)
  
  
@@ -213,4 +228,41 @@ def send_results_email(results):
     from engine.content_generator import generate_results_post
     subject = "EDGE EQUATION — " + datetime.now().strftime("%B %d") + " RESULTS"
     body = generate_results_post(results)
+    return _send(subject, body)
+ 
+ 
+def send_projections_only_email(mlb_games, mlb_pitchers, nba_games, nhl_games, nrfi_plays, personal_parlay=None, personal_pp=None, bankroll_summary=None, all_time_stats=None):
+    from engine.content_generator import get_daily_cta
+    date_str = datetime.now().strftime("%B %d")
+    subject = "EDGE EQUATION — " + date_str + " | Daily Projections"
+    sep = "=" * 50
+    todo = "\n".join([
+        "YOUR TO-DO LIST TODAY (~5 min)",
+        "=" * 40,
+        "",
+        "Step 1 — MLB POST (2 min): Copy MLB section → paste to X",
+        "Step 2 — PITCHER POST (1 min): Copy pitcher section → paste to X",
+        "Step 3 — NBA/NHL POST (1 min): Copy relevant section → paste to X",
+        "Step 4 — NRFI POST (1 min): Copy NRFI section → paste to X",
+        "",
+        "Everything else fires automatically.",
+        "",
+    ])
+    body_parts = [
+        todo,
+        format_projection_sections(mlb_games, mlb_pitchers, nba_games, nhl_games, nrfi_plays),
+    ]
+    if personal_parlay or personal_pp:
+        body_parts += ["", sep, "YOUR PERSONAL PLAYS (not posted)", sep]
+        if personal_parlay:
+            from engine.personal_engine import format_personal_parlay_text
+            from engine.kelly_calculator import calculate_parlay_units
+            units = calculate_parlay_units(personal_parlay.get("legs", []))
+            body_parts.append(format_personal_parlay_text(personal_parlay, units))
+        if personal_pp:
+            from engine.personal_engine import format_personal_prizepicks_text
+            body_parts.append(format_personal_prizepicks_text(personal_pp, 0.5))
+    if bankroll_summary and all_time_stats:
+        body_parts += ["", sep, "BANKROLL UPDATE", sep, format_bankroll_section(bankroll_summary, all_time_stats)]
+    body = "\n".join(body_parts)
     return _send(subject, body)
