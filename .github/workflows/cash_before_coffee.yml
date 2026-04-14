@@ -1,0 +1,104 @@
+name: Cash Before Coffee — Nightly Automation
+ 
+on:
+  schedule:
+    # CBC — 10:30 PM CST (3:30 UTC) nightly announce
+    - cron: "30 3 * * *"
+    # CBC — 11:00 PM CST (4:00 UTC) KBO projections
+    - cron: "0 4 * * *"
+    # CBC — 11:30 PM CST (4:30 UTC) NPB projections
+    - cron: "30 4 * * *"
+    # CBC — 6:00 AM CST (11:00 UTC) EPL/UCL projections
+    - cron: "0 11 * * *"
+    # CBC — 8:00 AM CST (13:00 UTC) overnight results
+    - cron: "0 13 * * *"
+ 
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Mode to run"
+        required: true
+        default: "cbc_kbo"
+        type: choice
+        options:
+          - cbc_announce
+          - cbc_kbo
+          - cbc_npb
+          - cbc_epl
+          - cbc_results
+      dry_run:
+        description: "Dry run"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "true"
+          - "false"
+ 
+jobs:
+  run-cash-before-coffee:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+ 
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+ 
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+ 
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+ 
+      - name: Determine CBC mode from schedule
+        run: |
+          EVENT="${{ github.event_name }}"
+          DRY="${{ github.event.inputs.dry_run }}"
+          INPUT_MODE="${{ github.event.inputs.mode }}"
+          if [ "$EVENT" = "schedule" ]; then
+            echo "DRY_RUN_FLAG=" >> $GITHUB_ENV
+            HOUR=$(date -u +"%H")
+            MIN=$(date -u +"%M")
+            if [ "$HOUR" = "03" ] && [ "$MIN" = "30" ]; then
+              echo "RUN_MODE=cbc_announce" >> $GITHUB_ENV
+            elif [ "$HOUR" = "04" ] && [ "$MIN" = "00" ]; then
+              echo "RUN_MODE=cbc_kbo" >> $GITHUB_ENV
+            elif [ "$HOUR" = "04" ] && [ "$MIN" = "30" ]; then
+              echo "RUN_MODE=cbc_npb" >> $GITHUB_ENV
+            elif [ "$HOUR" = "11" ] && [ "$MIN" = "00" ]; then
+              echo "RUN_MODE=cbc_epl" >> $GITHUB_ENV
+            elif [ "$HOUR" = "13" ] && [ "$MIN" = "00" ]; then
+              echo "RUN_MODE=cbc_results" >> $GITHUB_ENV
+            else
+              echo "RUN_MODE=cbc_kbo" >> $GITHUB_ENV
+            fi
+          else
+            echo "RUN_MODE=$INPUT_MODE" >> $GITHUB_ENV
+            if [ "$DRY" = "true" ]; then
+              echo "DRY_RUN_FLAG=--dry-run" >> $GITHUB_ENV
+            else
+              echo "DRY_RUN_FLAG=" >> $GITHUB_ENV
+            fi
+          fi
+ 
+      - name: Run Cash Before Coffee
+        env:
+          CBC_X_API_KEY:       ${{ secrets.CBC_X_API_KEY }}
+          CBC_X_API_SECRET:    ${{ secrets.CBC_X_API_SECRET }}
+          CBC_X_ACCESS_TOKEN:  ${{ secrets.CBC_X_ACCESS_TOKEN }}
+          CBC_X_ACCESS_SECRET: ${{ secrets.CBC_X_ACCESS_SECRET }}
+          X_API_KEY:           ${{ secrets.X_API_KEY }}
+          X_API_SECRET:        ${{ secrets.X_API_SECRET }}
+          X_ACCESS_TOKEN:      ${{ secrets.X_ACCESS_TOKEN }}
+          X_ACCESS_SECRET:     ${{ secrets.X_ACCESS_SECRET }}
+          EMAIL_FROM:          ${{ secrets.EMAIL_FROM }}
+          EMAIL_TO:            ${{ secrets.EMAIL_TO }}
+          EMAIL_PASSWORD:      ${{ secrets.EMAIL_PASSWORD }}
+          EMAIL_SMTP:          ${{ secrets.EMAIL_SMTP }}
+          FOOTBALL_DATA_KEY:   ${{ secrets.FOOTBALL_DATA_KEY }}
+          OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
+        run: |
+          echo "Running CBC mode=$RUN_MODE dry=$DRY_RUN_FLAG"
+          python main.py --mode $RUN_MODE $DRY_RUN_FLAG
