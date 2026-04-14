@@ -14,7 +14,8 @@ LEAGUE_AVG_GOALS = 2.6
 LEAGUE_AVG_KBO_RUNS = 5.2
 LEAGUE_AVG_NPB_RUNS = 4.1
  
-# TheSportsDB league IDs (free, no key required)
+# TheSportsDB — free tier key is 123, not 3
+TSDB_KEY = "123"
 TSDB_KBO_ID = 4830
 TSDB_NPB_ID = 4591
  
@@ -108,32 +109,43 @@ def get_kbo_projections():
  
  
 def _get_kbo_tsdb(date_str):
-    """Fetch KBO games via TheSportsDB (free, no key). ESPN KBO endpoint is dead."""
-    try:
-        url = f"https://www.thesportsdb.com/api/v1/json/3/eventsday.php?d={date_str}&l={TSDB_KBO_ID}"
-        resp = requests.get(url, timeout=10)
-        resp.raise_for_status()
-        data = resp.json()
-        events = data.get("events") or []
-        projections = []
-        for event in events:
-            home = event.get("strHomeTeam", "")
-            away = event.get("strAwayTeam", "")
-            if not home or not away:
-                continue
-            home_runs = round(LEAGUE_AVG_KBO_RUNS * 1.03, 1)
-            away_runs = round(LEAGUE_AVG_KBO_RUNS * 0.97, 1)
-            projections.append({
-                "home_team": home, "away_team": away,
-                "home_runs": home_runs, "away_runs": away_runs,
-                "total": round(home_runs + away_runs, 1),
-                "league": "KBO",
-            })
-        logger.info(f"KBO TheSportsDB: {len(projections)} games found")
-        return projections
-    except Exception as e:
-        logger.error(f"KBO TheSportsDB fetch failed: {e}")
-        return []
+    """Fetch KBO games via TheSportsDB free API (key=123)."""
+    base = f"https://www.thesportsdb.com/api/v1/json/{TSDB_KEY}"
+    urls_to_try = [
+        f"{base}/eventsday.php?d={date_str}&l={TSDB_KBO_ID}",
+        f"{base}/eventsnextleague.php?id={TSDB_KBO_ID}",
+    ]
+    for url in urls_to_try:
+        try:
+            resp = requests.get(url, timeout=10)
+            resp.raise_for_status()
+            data = resp.json()
+            events = data.get("events") or []
+            # filter to today when using nextleague fallback
+            today_events = [e for e in events if e.get("dateEvent", "") == date_str]
+            source_events = today_events if today_events else []
+            projections = []
+            for event in source_events:
+                home = event.get("strHomeTeam", "")
+                away = event.get("strAwayTeam", "")
+                if not home or not away:
+                    continue
+                home_runs = round(LEAGUE_AVG_KBO_RUNS * 1.03, 1)
+                away_runs = round(LEAGUE_AVG_KBO_RUNS * 0.97, 1)
+                projections.append({
+                    "home_team": home, "away_team": away,
+                    "home_runs": home_runs, "away_runs": away_runs,
+                    "total": round(home_runs + away_runs, 1),
+                    "league": "KBO",
+                })
+            if projections:
+                logger.info(f"KBO TheSportsDB: {len(projections)} games via {url}")
+                return projections
+        except Exception as e:
+            logger.warning(f"KBO TSDB attempt failed ({url}): {e}")
+            continue
+    logger.error("KBO: all TheSportsDB attempts failed — no games returned")
+    return []
  
  
 def get_npb_projections():
@@ -151,32 +163,42 @@ def get_npb_projections():
  
  
 def _get_npb_tsdb(date_str):
-    """Fetch NPB games via TheSportsDB (free, no key). ESPN NPB endpoint is dead."""
-    try:
-        url = f"https://www.thesportsdb.com/api/v1/json/3/eventsday.php?d={date_str}&l={TSDB_NPB_ID}"
-        resp = requests.get(url, timeout=10)
-        resp.raise_for_status()
-        data = resp.json()
-        events = data.get("events") or []
-        projections = []
-        for event in events:
-            home = event.get("strHomeTeam", "")
-            away = event.get("strAwayTeam", "")
-            if not home or not away:
-                continue
-            home_runs = round(LEAGUE_AVG_NPB_RUNS * 1.02, 1)
-            away_runs = round(LEAGUE_AVG_NPB_RUNS * 0.98, 1)
-            projections.append({
-                "home_team": home, "away_team": away,
-                "home_runs": home_runs, "away_runs": away_runs,
-                "total": round(home_runs + away_runs, 1),
-                "league": "NPB",
-            })
-        logger.info(f"NPB TheSportsDB: {len(projections)} games found")
-        return projections
-    except Exception as e:
-        logger.error(f"NPB TheSportsDB fetch failed: {e}")
-        return []
+    """Fetch NPB games via TheSportsDB free API (key=123)."""
+    base = f"https://www.thesportsdb.com/api/v1/json/{TSDB_KEY}"
+    urls_to_try = [
+        f"{base}/eventsday.php?d={date_str}&l={TSDB_NPB_ID}",
+        f"{base}/eventsnextleague.php?id={TSDB_NPB_ID}",
+    ]
+    for url in urls_to_try:
+        try:
+            resp = requests.get(url, timeout=10)
+            resp.raise_for_status()
+            data = resp.json()
+            events = data.get("events") or []
+            today_events = [e for e in events if e.get("dateEvent", "") == date_str]
+            source_events = today_events if today_events else []
+            projections = []
+            for event in source_events:
+                home = event.get("strHomeTeam", "")
+                away = event.get("strAwayTeam", "")
+                if not home or not away:
+                    continue
+                home_runs = round(LEAGUE_AVG_NPB_RUNS * 1.02, 1)
+                away_runs = round(LEAGUE_AVG_NPB_RUNS * 0.98, 1)
+                projections.append({
+                    "home_team": home, "away_team": away,
+                    "home_runs": home_runs, "away_runs": away_runs,
+                    "total": round(home_runs + away_runs, 1),
+                    "league": "NPB",
+                })
+            if projections:
+                logger.info(f"NPB TheSportsDB: {len(projections)} games via {url}")
+                return projections
+        except Exception as e:
+            logger.warning(f"NPB TSDB attempt failed ({url}): {e}")
+            continue
+    logger.error("NPB: all TheSportsDB attempts failed — no games returned")
+    return []
  
  
 def format_epl_projection_post(projections):
