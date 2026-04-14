@@ -1,6 +1,7 @@
 import requests
 import logging
 from datetime import datetime, timedelta
+from bs4 import BeautifulSoup
  
 logger = logging.getLogger(__name__)
  
@@ -14,11 +15,12 @@ LEAGUE_AVG_GOALS = 2.6
 LEAGUE_AVG_KBO_RUNS = 5.2
 LEAGUE_AVG_NPB_RUNS = 4.1
  
-# TheSportsDB — free tier key is 123
-TSDB_KEY = "123"
-TSDB_KBO_ID = 4830
-TSDB_NPB_ID = 4591
+HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
  
+ 
+# ─────────────────────────────────────────────
+# EPL / UCL
+# ─────────────────────────────────────────────
  
 def get_epl_projections():
     try:
@@ -94,11 +96,15 @@ def _project_soccer_score(home_team, away_team):
     return home_goals, away_goals
  
  
+# ─────────────────────────────────────────────
+# KBO — scrape MyKBOStats
+# ─────────────────────────────────────────────
+ 
 def get_kbo_projections():
     try:
         today_kst = (datetime.now() + timedelta(hours=14)).strftime("%Y-%m-%d")
-        logger.info("KBO: fetching via TheSportsDB for KST date " + today_kst)
-        projections = _get_kbo_tsdb(today_kst)
+        logger.info("KBO: scraping MyKBOStats for KST date " + today_kst)
+        projections = _scrape_kbo()
         if not projections:
             logger.info("KBO: no games found today")
         logger.info("KBO projections: " + str(len(projections)) + " games")
@@ -108,87 +114,100 @@ def get_kbo_projections():
         return []
  
  
-def _get_kbo_tsdb(date_str):
-    """Fetch KBO games via TheSportsDB free API.
-    Strategy:
-    1. eventsday.php — fast, date-specific (may be empty on free tier)
-    2. eventsseason.php — full season filtered to today (most reliable)
-    3. eventsnextleague.php — next game only (last resort)
-    """
-    base = f"https://www.thesportsdb.com/api/v1/json/{TSDB_KEY}"
- 
-    # Attempt 1: eventsday
+def _scrape_kbo():
+    """Scrape today's KBO games from MyKBOStats."""
     try:
-        url = f"{base}/eventsday.php?d={date_str}&l={TSDB_KBO_ID}"
+        resp = requests.get("https://mykbostats.com/", headers=HEADERS, timeout=10)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "html.parser")
+        projections = []
+ 
+        # MyKBOStats shows today's matchups in game cards
+        # Try multiple selectors to be resilient to HTML changes
+        game_blocks = (
+            soup.select(".game-card") or
+            soup.select(".matchup") or
+            soup.select("[class*='game']") or
+            soup.select("table tr")
+        )
+ 
+        for block in game_blocks:
+            teams = block.select("[class*='team']")
+            team_names = [t.get_text(strip=True) for t in teams if t.get_text(strip=True)]
+            team_names = [t for t in team_names if len(t) > 2 and not t.isdigit()]
+            if len(team_names) >= 2:
+                away = team_names[0]
+                home = team_names[1]
+                home_runs = round(LEAGUE_AVG_KBO_RUNS * 1.03, 1)
+                away_runs = round(LEAGUE_AVG_KBO_RUNS * 0.97, 1)
+                projections.append({
+                    "home_team": home, "away_team": away,
+                    "home_runs": home_runs, "away_runs": away_runs,
+                    "total": round(home_runs + away_runs, 1),
+                    "league": "KBO",
+                })
+ 
+        # Deduplicate by home+away pair
+        seen = set()
+        unique = []
+        for p in projections:
+            key = (p["home_team"], p["away_team"])
+            if key not in seen:
+                seen.add(key)
+                unique.append(p)
+ 
+        if unique:
+            logger.info(f"KBO MyKBOStats scrape: {len(unique)} games")
+            return unique
+ 
+    except Exception as e:
+        logger.warning(f"KBO MyKBOStats scrape failed: {e}")
+ 
+    # Fallback: TheSportsDB
+    logger.warning("KBO falling back to TheSportsDB")
+    return _kbo_tsdb_fallback()
+ 
+ 
+def _kbo_tsdb_fallback():
+    """TheSportsDB fallback — may only return 1 game."""
+    try:
+        today_kst = (datetime.now() + timedelta(hours=14)).strftime("%Y-%m-%d")
+        base = "https://www.thesportsdb.com/api/v1/json/123"
+        url = f"{base}/eventsnextleague.php?id=4830"
         resp = requests.get(url, timeout=10)
         resp.raise_for_status()
         events = resp.json().get("events") or []
-        today_events = [e for e in events if e.get("dateEvent", "") == date_str]
-        if today_events:
-            projections = _build_kbo_projections(today_events)
-            if projections:
-                logger.info(f"KBO eventsday: {len(projections)} games")
-                return projections
+        today_events = [e for e in events if e.get("dateEvent", "") == today_kst]
+        projections = []
+        for event in today_events:
+            home = event.get("strHomeTeam", "")
+            away = event.get("strAwayTeam", "")
+            if not home or not away:
+                continue
+            home_runs = round(LEAGUE_AVG_KBO_RUNS * 1.03, 1)
+            away_runs = round(LEAGUE_AVG_KBO_RUNS * 0.97, 1)
+            projections.append({
+                "home_team": home, "away_team": away,
+                "home_runs": home_runs, "away_runs": away_runs,
+                "total": round(home_runs + away_runs, 1),
+                "league": "KBO",
+            })
+        logger.info(f"KBO TheSportsDB fallback: {len(projections)} games")
+        return projections
     except Exception as e:
-        logger.warning(f"KBO eventsday failed: {e}")
- 
-    # Attempt 2: eventsseason — full 2026 season, filter to today
-    try:
-        url = f"{base}/eventsseason.php?id={TSDB_KBO_ID}&s=2026"
-        resp = requests.get(url, timeout=15)
-        resp.raise_for_status()
-        events = resp.json().get("events") or []
-        today_events = [e for e in events if e.get("dateEvent", "") == date_str]
-        if today_events:
-            projections = _build_kbo_projections(today_events)
-            if projections:
-                logger.info(f"KBO eventsseason: {len(projections)} games")
-                return projections
-    except Exception as e:
-        logger.warning(f"KBO eventsseason failed: {e}")
- 
-    # Attempt 3: eventsnextleague — last resort, 1 game only
-    try:
-        url = f"{base}/eventsnextleague.php?id={TSDB_KBO_ID}"
-        resp = requests.get(url, timeout=10)
-        resp.raise_for_status()
-        events = resp.json().get("events") or []
-        today_events = [e for e in events if e.get("dateEvent", "") == date_str]
-        if today_events:
-            projections = _build_kbo_projections(today_events)
-            if projections:
-                logger.info(f"KBO eventsnext (last resort): {len(projections)} games")
-                return projections
-    except Exception as e:
-        logger.warning(f"KBO eventsnext failed: {e}")
- 
-    logger.error("KBO: all TheSportsDB attempts failed — no games returned")
-    return []
+        logger.error(f"KBO TheSportsDB fallback failed: {e}")
+        return []
  
  
-def _build_kbo_projections(events):
-    projections = []
-    for event in events:
-        home = event.get("strHomeTeam", "")
-        away = event.get("strAwayTeam", "")
-        if not home or not away:
-            continue
-        home_runs = round(LEAGUE_AVG_KBO_RUNS * 1.03, 1)
-        away_runs = round(LEAGUE_AVG_KBO_RUNS * 0.97, 1)
-        projections.append({
-            "home_team": home, "away_team": away,
-            "home_runs": home_runs, "away_runs": away_runs,
-            "total": round(home_runs + away_runs, 1),
-            "league": "KBO",
-        })
-    return projections
- 
+# ─────────────────────────────────────────────
+# NPB — scrape npb.jp official site
+# ─────────────────────────────────────────────
  
 def get_npb_projections():
     try:
         today_jst = (datetime.now() + timedelta(hours=14)).strftime("%Y-%m-%d")
-        logger.info("NPB: fetching via TheSportsDB for JST date " + today_jst)
-        projections = _get_npb_tsdb(today_jst)
+        logger.info("NPB: scraping npb.jp for JST date " + today_jst)
+        projections = _scrape_npb()
         if not projections:
             logger.info("NPB: no games found today")
         logger.info("NPB projections: " + str(len(projections)) + " games")
@@ -198,81 +217,92 @@ def get_npb_projections():
         return []
  
  
-def _get_npb_tsdb(date_str):
-    """Fetch NPB games via TheSportsDB free API.
-    Strategy:
-    1. eventsday.php — fast, date-specific
-    2. eventsseason.php — full season filtered to today
-    3. eventsnextleague.php — last resort
-    """
-    base = f"https://www.thesportsdb.com/api/v1/json/{TSDB_KEY}"
- 
-    # Attempt 1: eventsday
+def _scrape_npb():
+    """Scrape today's NPB games from npb.jp official English site."""
     try:
-        url = f"{base}/eventsday.php?d={date_str}&l={TSDB_NPB_ID}"
+        resp = requests.get("https://npb.jp/bis/eng/2026/games/", headers=HEADERS, timeout=10)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "html.parser")
+        projections = []
+ 
+        # npb.jp uses tables for game listings
+        # Each row has away team, score/time, home team
+        rows = soup.select("table tr")
+        for row in rows:
+            cells = row.select("td")
+            if len(cells) >= 3:
+                away = cells[0].get_text(strip=True)
+                home = cells[-1].get_text(strip=True)
+                # Filter out header rows and empty cells
+                if (away and home and
+                    len(away) > 2 and len(home) > 2 and
+                    not away.isdigit() and not home.isdigit() and
+                    away.lower() not in ("away", "visitor", "team") and
+                    home.lower() not in ("home", "team")):
+                    home_runs = round(LEAGUE_AVG_NPB_RUNS * 1.02, 1)
+                    away_runs = round(LEAGUE_AVG_NPB_RUNS * 0.98, 1)
+                    projections.append({
+                        "home_team": home, "away_team": away,
+                        "home_runs": home_runs, "away_runs": away_runs,
+                        "total": round(home_runs + away_runs, 1),
+                        "league": "NPB",
+                    })
+ 
+        # Deduplicate
+        seen = set()
+        unique = []
+        for p in projections:
+            key = (p["home_team"], p["away_team"])
+            if key not in seen:
+                seen.add(key)
+                unique.append(p)
+ 
+        if unique:
+            logger.info(f"NPB npb.jp scrape: {len(unique)} games")
+            return unique
+ 
+    except Exception as e:
+        logger.warning(f"NPB npb.jp scrape failed: {e}")
+ 
+    # Fallback: TheSportsDB
+    logger.warning("NPB falling back to TheSportsDB")
+    return _npb_tsdb_fallback()
+ 
+ 
+def _npb_tsdb_fallback():
+    """TheSportsDB fallback for NPB."""
+    try:
+        today_jst = (datetime.now() + timedelta(hours=14)).strftime("%Y-%m-%d")
+        base = "https://www.thesportsdb.com/api/v1/json/123"
+        url = f"{base}/eventsnextleague.php?id=4591"
         resp = requests.get(url, timeout=10)
         resp.raise_for_status()
         events = resp.json().get("events") or []
-        today_events = [e for e in events if e.get("dateEvent", "") == date_str]
-        if today_events:
-            projections = _build_npb_projections(today_events)
-            if projections:
-                logger.info(f"NPB eventsday: {len(projections)} games")
-                return projections
+        today_events = [e for e in events if e.get("dateEvent", "") == today_jst]
+        projections = []
+        for event in today_events:
+            home = event.get("strHomeTeam", "")
+            away = event.get("strAwayTeam", "")
+            if not home or not away:
+                continue
+            home_runs = round(LEAGUE_AVG_NPB_RUNS * 1.02, 1)
+            away_runs = round(LEAGUE_AVG_NPB_RUNS * 0.98, 1)
+            projections.append({
+                "home_team": home, "away_team": away,
+                "home_runs": home_runs, "away_runs": away_runs,
+                "total": round(home_runs + away_runs, 1),
+                "league": "NPB",
+            })
+        logger.info(f"NPB TheSportsDB fallback: {len(projections)} games")
+        return projections
     except Exception as e:
-        logger.warning(f"NPB eventsday failed: {e}")
- 
-    # Attempt 2: eventsseason — full 2026 season, filter to today
-    try:
-        url = f"{base}/eventsseason.php?id={TSDB_NPB_ID}&s=2026"
-        resp = requests.get(url, timeout=15)
-        resp.raise_for_status()
-        events = resp.json().get("events") or []
-        today_events = [e for e in events if e.get("dateEvent", "") == date_str]
-        if today_events:
-            projections = _build_npb_projections(today_events)
-            if projections:
-                logger.info(f"NPB eventsseason: {len(projections)} games")
-                return projections
-    except Exception as e:
-        logger.warning(f"NPB eventsseason failed: {e}")
- 
-    # Attempt 3: eventsnextleague — last resort
-    try:
-        url = f"{base}/eventsnextleague.php?id={TSDB_NPB_ID}"
-        resp = requests.get(url, timeout=10)
-        resp.raise_for_status()
-        events = resp.json().get("events") or []
-        today_events = [e for e in events if e.get("dateEvent", "") == date_str]
-        if today_events:
-            projections = _build_npb_projections(today_events)
-            if projections:
-                logger.info(f"NPB eventsnext (last resort): {len(projections)} games")
-                return projections
-    except Exception as e:
-        logger.warning(f"NPB eventsnext failed: {e}")
- 
-    logger.error("NPB: all TheSportsDB attempts failed — no games returned")
-    return []
+        logger.error(f"NPB TheSportsDB fallback failed: {e}")
+        return []
  
  
-def _build_npb_projections(events):
-    projections = []
-    for event in events:
-        home = event.get("strHomeTeam", "")
-        away = event.get("strAwayTeam", "")
-        if not home or not away:
-            continue
-        home_runs = round(LEAGUE_AVG_NPB_RUNS * 1.02, 1)
-        away_runs = round(LEAGUE_AVG_NPB_RUNS * 0.98, 1)
-        projections.append({
-            "home_team": home, "away_team": away,
-            "home_runs": home_runs, "away_runs": away_runs,
-            "total": round(home_runs + away_runs, 1),
-            "league": "NPB",
-        })
-    return projections
- 
+# ─────────────────────────────────────────────
+# Format posts
+# ─────────────────────────────────────────────
  
 def format_epl_projection_post(projections):
     if not projections:
