@@ -18,11 +18,16 @@ CBC_X_ACCESS_SECRET = os.getenv("CBC_X_ACCESS_SECRET", X_ACCESS_SECRET)
  
 def _get_client(account="ee"):
     if account == "cbc":
+        # Fall back to EE keys if CBC keys not configured
+        api_key = CBC_X_API_KEY or X_API_KEY
+        api_secret = CBC_X_API_SECRET or X_API_SECRET
+        access_token = CBC_X_ACCESS_TOKEN or X_ACCESS_TOKEN
+        access_secret = CBC_X_ACCESS_SECRET or X_ACCESS_SECRET
         return tweepy.Client(
-            consumer_key=CBC_X_API_KEY,
-            consumer_secret=CBC_X_API_SECRET,
-            access_token=CBC_X_ACCESS_TOKEN,
-            access_token_secret=CBC_X_ACCESS_SECRET,
+            consumer_key=api_key,
+            consumer_secret=api_secret,
+            access_token=access_token,
+            access_token_secret=access_secret,
         )
     return tweepy.Client(
         consumer_key=X_API_KEY,
