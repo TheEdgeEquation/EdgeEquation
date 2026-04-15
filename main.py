@@ -126,10 +126,15 @@ def run_potd(dry_run, no_graphic):
     if not top:
         return
  
-    sport = top.get("sport", "MLB")
-    text = generate_potd(sport, top)
-    if not text:
-        return
+    sport_raw = top.get("sport", "MLB")
+sport_map = {
+    "baseball_mlb": "MLB",
+    "basketball_nba": "NBA",
+    "icehockey_nhl": "NHL",
+    "americanfootball_nfl": "NFL",
+    "basketball_wnba": "WNBA",
+}
+sport = sport_map.get(sport_raw, sport_raw.upper())
  
     _post_safe(text[:280], "ee", "EE_potd", "EE", state, dry_run)
  
