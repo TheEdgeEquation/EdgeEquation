@@ -465,4 +465,3 @@ if __name__ == "__main__":
     }
     text = generate_potd("MLB", prop)
     print("POTD:\n", text)
- 
