@@ -4,9 +4,6 @@ import sys
 import time
 from datetime import datetime
 
-# ---------------------------------------------------------
-# Logging
-# ---------------------------------------------------------
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -14,9 +11,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger("main")
 
-# ---------------------------------------------------------
-# Imports — unchanged from your existing system
-# ---------------------------------------------------------
 from engine.edge_calculator import grade_all_props, calculate_nrfi_plays
 from engine.data_tracker import save_plays, build_weekly_stats, build_all_time_stats, save_results
 from engine.score_checker import check_all_results
@@ -39,17 +33,6 @@ from engine.game_projector import (
     get_mlb_game_projections, get_nba_game_projections,
     get_nhl_game_projections, get_mlb_pitcher_projections,
 )
-
-# ---------------------------------------------------------
-# NEW PLAYOFF ENGINE IMPORTS
-# ---------------------------------------------------------
-from engine.playoff_engine import project_series
-from engine.playoff_matchups import NBA_PLAYOFF_MATCHUPS, NHL_PLAYOFF_MATCHUPS
-from engine.playoff_formatter import format_league_overview, format_all_matchups
-
-# ---------------------------------------------------------
-# Other engines
-# ---------------------------------------------------------
 from engine.kbo_scraper import get_kbo_projections
 from engine.npb_scraper import get_npb_projections
 from engine.cbc_projector import (
@@ -66,9 +49,12 @@ from engine.highlight_generator import (
     generate_daily_accuracy_post,
 )
 
-# ---------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------
+# NEW: playoff engine + auto bracket
+from engine.playoff_engine import project_series
+from engine.playoff_formatter import format_league_overview, format_all_matchups
+from engine.bracket_auto import get_nba_playoff_matchups, get_nhl_playoff_matchups
+
+
 def _today():
     return datetime.now().strftime("%Y%m%d")
 
@@ -87,10 +73,6 @@ def _fetch_props():
             time.sleep(5 * 60)
     return []
 
-
-# ---------------------------------------------------------
-# MODES — unchanged logic, cleaner structure
-# ---------------------------------------------------------
 
 def run_system_status(dry_run, no_graphic):
     logger.info("MODE: system_status")
@@ -111,7 +93,9 @@ def run_system_status(dry_run, no_graphic):
     ])
     if not dry_run:
         post_tweet(caption)
-    logger.info("[DRY RUN]" if dry_run else "System status posted")
+        logger.info("System status posted")
+    else:
+        logger.info("[DRY RUN] System status:\n" + caption)
 
 
 def run_gotd(dry_run, no_graphic):
@@ -145,8 +129,9 @@ def run_gotd(dry_run, no_graphic):
 
         if not dry_run:
             post_tweet(post_text)
-        logger.info("[DRY RUN]" if dry_run else "GOTD posted")
-
+            logger.info("GOTD posted")
+        else:
+            logger.info("[DRY RUN] GOTD:\n" + post_text)
     except Exception as e:
         logger.error("GOTD failed: " + str(e))
 
@@ -173,15 +158,21 @@ def run_potd(dry_run, no_graphic):
 
         if top_prop:
             post_text = generate_potd_from_play(top_prop)
-            if not dry_run:
-                post_tweet(post_text)
-            logger.info("[DRY RUN]" if dry_run else "POTD posted")
+            if post_text:
+                if not dry_run:
+                    post_tweet(post_text)
+                    logger.info("POTD posted")
+                else:
+                    logger.info("[DRY RUN] POTD:\n" + post_text)
 
         if top_nrfi:
             fi_text = generate_first_inning_from_play(top_nrfi)
-            if not dry_run:
-                post_tweet(fi_text)
-            logger.info("[DRY RUN]" if dry_run else "First Inning Spotlight posted")
+            if fi_text:
+                if not dry_run:
+                    post_tweet(fi_text)
+                    logger.info("First Inning Spotlight posted")
+                else:
+                    logger.info("[DRY RUN] First Inning Spotlight:\n" + fi_text)
 
     except Exception as e:
         logger.error("POTD failed: " + str(e))
@@ -192,12 +183,11 @@ def run_announce(dry_run, no_graphic):
     caption = caption_announce()
     if not dry_run:
         post_tweet(caption)
-    logger.info("[DRY RUN]" if dry_run else "Announce posted")
+        logger.info("Announce posted")
+    else:
+        logger.info("[DRY RUN] Announce:\n" + caption)
 
 
-# ---------------------------------------------------------
-# DAILY MODE — unchanged logic
-# ---------------------------------------------------------
 def run_daily(dry_run, no_graphic):
     logger.info("MODE: daily")
 
@@ -251,22 +241,31 @@ def run_daily(dry_run, no_graphic):
     if not dry_run:
         if mlb_games:
             post_tweet(generate_mlb_projection_post(mlb_games))
+            logger.info("MLB projections posted")
         if mlb_pitchers:
             post_tweet(generate_pitcher_projection_post(mlb_pitchers))
+            logger.info("Pitcher projections posted")
         if nba_games:
             post_tweet(generate_nba_projection_post(nba_games))
+            logger.info("NBA projections posted")
         if nhl_games:
             post_tweet(generate_nhl_projection_post(nhl_games))
+            logger.info("NHL projections posted")
         if nrfi_plays:
             post_tweet(generate_nrfi_probability_post(nrfi_plays))
+            logger.info("NRFI posted")
         if kbo_games:
             post_tweet(generate_kbo_projection_post(kbo_games))
+            logger.info("KBO projections posted")
         if npb_games:
             post_tweet(generate_npb_projection_post(npb_games))
+            logger.info("NPB projections posted")
         if epl_games:
             post_tweet(generate_epl_projection_post(epl_games))
+            logger.info("EPL projections posted")
         if ucl_games:
             post_tweet(generate_ucl_projection_post(ucl_games))
+            logger.info("UCL projections posted")
         if clv_post:
             post_tweet(clv_post)
 
@@ -277,13 +276,22 @@ def run_daily(dry_run, no_graphic):
             personal_parlay=personal_parlay, personal_pp=personal_pp,
             bankroll_summary=bankroll, all_time_stats=all_time,
         )
+        logger.info("Email sent")
     else:
-        logger.info("[DRY RUN] Daily mode executed")
+        posts = sum([
+            bool(mlb_games), bool(mlb_pitchers), bool(nba_games),
+            bool(nhl_games), bool(nrfi_plays), bool(kbo_games),
+            bool(npb_games), bool(epl_games), bool(ucl_games)
+        ])
+        logger.info(f"[DRY RUN] Would post {posts} projection posts to X")
+        if mlb_games:
+            logger.info("[DRY RUN] MLB sample:\n" + generate_mlb_projection_post(mlb_games[:3]))
+        if mlb_pitchers:
+            logger.info("[DRY RUN] Pitcher sample:\n" + generate_pitcher_projection_post(mlb_pitchers[:5]))
+        if nrfi_plays:
+            logger.info("[DRY RUN] NRFI sample:\n" + generate_nrfi_probability_post(nrfi_plays[:4]))
 
 
-# ---------------------------------------------------------
-# RESULTS MODE — unchanged logic
-# ---------------------------------------------------------
 def run_results(dry_run, no_graphic):
     logger.info("MODE: results")
     try:
@@ -295,43 +303,47 @@ def run_results(dry_run, no_graphic):
             if not dry_run:
                 post_tweet(results_text)
                 send_results_email(verified)
+                logger.info("Results posted and emailed")
             else:
                 logger.info("[DRY RUN] Results:\n" + results_text)
 
         logger.info("Checking game projections vs actuals...")
-        from engine.data_tracker import load_plays
-        todays_plays = load_plays(_today(), "ee")
-        mlb_game_projs = [
-            p for p in todays_plays
-            if p.get("sport") == "baseball_mlb" and p.get("prop_label") not in ("K", "NRFI", "YRFI")
-        ]
-        pitcher_projs = [p for p in todays_plays if p.get("prop_label") == "K"]
-
-        game_hits, game_misses = check_mlb_results(mlb_game_projs)
-        pitcher_hits, pitcher_misses = check_pitcher_results(pitcher_projs)
-
-        if not dry_run:
-            called_it = generate_called_it_post(pitcher_hits, "pitcher")
-            if called_it:
-                post_tweet(called_it)
-
-            called_it_game = generate_called_it_post(game_hits, "game")
-            if called_it_game:
-                post_tweet(called_it_game)
-
-            accuracy = generate_daily_accuracy_post(game_hits, game_misses, pitcher_hits, pitcher_misses)
-            if accuracy:
-                post_tweet(accuracy)
-        else:
-            logger.info("[DRY RUN] Results mode executed")
-
+        try:
+            from engine.data_tracker import load_plays
+            todays_plays = load_plays(_today(), "ee")
+            mlb_game_projs = [
+                p for p in todays_plays
+                if p.get("sport") == "baseball_mlb" and p.get("prop_label") not in ("K", "NRFI", "YRFI")
+            ]
+            pitcher_projs = [p for p in todays_plays if p.get("prop_label") == "K"]
+            game_hits, game_misses = check_mlb_results(mlb_game_projs)
+            pitcher_hits, pitcher_misses = check_pitcher_results(pitcher_projs)
+            logger.info(f"Game hits: {len(game_hits)} misses: {len(game_misses)}")
+            logger.info(f"Pitcher hits: {len(pitcher_hits)} misses: {len(pitcher_misses)}")
+            if not dry_run:
+                called_it = generate_called_it_post(pitcher_hits, "pitcher")
+                if called_it:
+                    post_tweet(called_it)
+                    logger.info("Called it post sent")
+                called_it_game = generate_called_it_post(game_hits, "game")
+                if called_it_game:
+                    post_tweet(called_it_game)
+                    logger.info("Called it game post sent")
+                accuracy = generate_daily_accuracy_post(game_hits, game_misses, pitcher_hits, pitcher_misses)
+                if accuracy:
+                    post_tweet(accuracy)
+                    logger.info("Accuracy report posted")
+            else:
+                if pitcher_hits:
+                    logger.info("[DRY RUN] Called it:\n" + generate_called_it_post(pitcher_hits, "pitcher"))
+                accuracy = generate_daily_accuracy_post(game_hits, game_misses, pitcher_hits, pitcher_misses)
+                logger.info("[DRY RUN] Accuracy:\n" + accuracy)
+        except Exception as e:
+            logger.error("Highlight generation failed: " + str(e))
     except Exception as e:
         logger.error("Results failed: " + str(e))
 
 
-# ---------------------------------------------------------
-# WEEKLY MODE — unchanged
-# ---------------------------------------------------------
 def run_weekly(dry_run, no_graphic):
     logger.info("MODE: weekly")
     stats = build_weekly_stats(style="ee")
@@ -341,27 +353,28 @@ def run_weekly(dry_run, no_graphic):
     caption = caption_weekly(stats)
     if not dry_run:
         post_tweet(caption)
-    logger.info("[DRY RUN]" if dry_run else "Weekly posted")
+        logger.info("Weekly roundup posted")
+    else:
+        logger.info("[DRY RUN] Weekly:\n" + caption)
 
 
-# ---------------------------------------------------------
-# **NEW CLEAN PLAYOFF MODE**
-# ---------------------------------------------------------
 def run_playoffs(dry_run, no_graphic):
     logger.info("MODE: playoffs")
 
     # NBA
+    nba_matchups = get_nba_playoff_matchups()
     nba_projections = [
         project_series(m["higher_seed"], m["lower_seed"], m["conference"], "nba")
-        for m in NBA_PLAYOFF_MATCHUPS
+        for m in nba_matchups
     ]
     nba_overview = format_league_overview("nba")
     nba_posts = format_all_matchups(nba_projections)
 
     # NHL
+    nhl_matchups = get_nhl_playoff_matchups()
     nhl_projections = [
         project_series(m["higher_seed"], m["lower_seed"], m["conference"], "nhl")
-        for m in NHL_PLAYOFF_MATCHUPS
+        for m in nhl_matchups
     ]
     nhl_overview = format_league_overview("nhl")
     nhl_posts = format_all_matchups(nhl_projections)
@@ -370,20 +383,19 @@ def run_playoffs(dry_run, no_graphic):
         post_tweet(nba_overview)
         for p in nba_posts:
             post_tweet(p)
-
         post_tweet(nhl_overview)
         for p in nhl_posts:
             post_tweet(p)
-
         logger.info("Playoff threads posted")
     else:
         logger.info("[DRY RUN] NBA Overview:\n" + nba_overview)
+        for p in nba_posts:
+            logger.info("[DRY RUN] NBA Matchup:\n" + p)
         logger.info("[DRY RUN] NHL Overview:\n" + nhl_overview)
+        for p in nhl_posts:
+            logger.info("[DRY RUN] NHL Matchup:\n" + p)
 
 
-# ---------------------------------------------------------
-# CBC MODES — unchanged
-# ---------------------------------------------------------
 def run_cbc_announce(dry_run, no_graphic):
     logger.info("MODE: cbc_announce")
     date_str = datetime.now().strftime("%B %-d")
@@ -400,7 +412,9 @@ def run_cbc_announce(dry_run, no_graphic):
     ])
     if not dry_run:
         post_tweet(caption)
-    logger.info("[DRY RUN]" if dry_run else "CBC announce posted")
+        logger.info("CBC announce posted")
+    else:
+        logger.info("[DRY RUN] CBC announce:\n" + caption)
 
 
 def run_cbc_kbo(dry_run, no_graphic):
@@ -412,7 +426,9 @@ def run_cbc_kbo(dry_run, no_graphic):
         return
     if not dry_run:
         post_tweet(post_text)
-    logger.info("[DRY RUN]" if dry_run else "KBO posted")
+        logger.info("KBO projections posted")
+    else:
+        logger.info("[DRY RUN] KBO:\n" + post_text)
 
 
 def run_cbc_npb(dry_run, no_graphic):
@@ -424,7 +440,9 @@ def run_cbc_npb(dry_run, no_graphic):
         return
     if not dry_run:
         post_tweet(post_text)
-    logger.info("[DRY RUN]" if dry_run else "NPB posted")
+        logger.info("NPB projections posted")
+    else:
+        logger.info("[DRY RUN] NPB:\n" + post_text)
 
 
 def run_cbc_epl(dry_run, no_graphic):
@@ -435,13 +453,18 @@ def run_cbc_epl(dry_run, no_graphic):
         post_text = format_epl_projection_post(epl)
         if not dry_run:
             post_tweet(post_text)
+            logger.info("EPL projections posted")
+        else:
+            logger.info("[DRY RUN] EPL:\n" + post_text)
     if ucl:
         post_text = format_ucl_projection_post(ucl)
         if not dry_run:
             post_tweet(post_text)
+            logger.info("UCL projections posted")
+        else:
+            logger.info("[DRY RUN] UCL:\n" + post_text)
     if not epl and not ucl:
         logger.info("No EPL/UCL games today")
-    logger.info("[DRY RUN]" if dry_run else "CBC EPL/UCL posted")
 
 
 def run_cbc_results(dry_run, no_graphic):
@@ -449,7 +472,9 @@ def run_cbc_results(dry_run, no_graphic):
     results_text = format_cbc_results_post([])
     if not dry_run:
         post_tweet(results_text)
-    logger.info("[DRY RUN]" if dry_run else "CBC results posted")
+        logger.info("CBC results posted")
+    else:
+        logger.info("[DRY RUN] CBC results:\n" + results_text)
 
 
 def run_cbc_gotd(dry_run, no_graphic):
@@ -473,4 +498,106 @@ def run_cbc_gotd(dry_run, no_graphic):
             key_factors=[
                 "Model projects above-average scoring environment",
                 "Home side shows strong recent form",
-                "Market
+                "Market total may undervalue pace of play",
+            ],
+        )
+        if not dry_run:
+            post_tweet(post_text)
+            logger.info("CBC GOTD posted")
+        else:
+            logger.info("[DRY RUN] CBC GOTD:\n" + post_text)
+    except Exception as e:
+        logger.error("CBC GOTD failed: " + str(e))
+
+
+def run_cbc_potd(dry_run, no_graphic):
+    logger.info("MODE: cbc_potd — not yet implemented for overseas")
+
+
+def run_scan_game(dry_run, no_graphic):
+    logger.info("MODE: scan_game")
+    mlb = get_mlb_game_projections()
+    nba = get_nba_game_projections()
+    nhl = get_nhl_game_projections()
+    mvv = generate_model_vs_vegas_post([])
+    logger.info(f"Scan complete: MLB={len(mlb)} NBA={len(nba)} NHL={len(nhl)}")
+
+
+def run_scan_prop(dry_run, no_graphic):
+    logger.info("MODE: scan_prop")
+    props = _fetch_props()
+    graded = grade_all_props(props) if props else []
+    logger.info(f"Scan complete: {len(graded)} props graded")
+
+
+def run_scan_nrfi(dry_run, no_graphic):
+    logger.info("MODE: scan_nrfi")
+    nrfi = calculate_nrfi_plays() or []
+    logger.info(f"Scan complete: {len(nrfi)} NRFI/YRFI plays")
+
+
+def run_weekly_reminder(dry_run, no_graphic):
+    from engine.phase_reminder import run_phase_reminder
+    run_phase_reminder("weekly")
+
+
+def run_monthly_reminder(dry_run, no_graphic):
+    from engine.phase_reminder import run_phase_reminder
+    run_phase_reminder("monthly")
+
+
+def run_phase2(dry_run, no_graphic):
+    from engine.phase_reminder import run_phase_reminder
+    run_phase_reminder("phase2")
+
+
+def run_phase3(dry_run, no_graphic):
+    from engine.phase_reminder import run_phase_reminder
+    run_phase_reminder("phase3")
+
+
+def run_phase4(dry_run, no_graphic):
+    from engine.phase_reminder import run_phase_reminder
+    run_phase_reminder("phase4")
+
+
+MODES = {
+    "system_status": run_system_status,
+    "gotd": run_gotd,
+    "potd": run_potd,
+    "announce": run_announce,
+    "daily": run_daily,
+    "results": run_results,
+    "weekly": run_weekly,
+    "playoffs": run_playoffs,
+    "cbc_announce": run_cbc_announce,
+    "cbc_kbo": run_cbc_kbo,
+    "cbc_npb": run_cbc_npb,
+    "cbc_epl": run_cbc_epl,
+    "cbc_results": run_cbc_results,
+    "cbc_gotd": run_cbc_gotd,
+    "cbc_potd": run_cbc_potd,
+    "scan_game": run_scan_game,
+    "scan_prop": run_scan_prop,
+    "scan_nrfi": run_scan_nrfi,
+    "weekly_reminder": run_weekly_reminder,
+    "monthly_reminder": run_monthly_reminder,
+    "phase2": run_phase2,
+    "phase3": run_phase3,
+    "phase4": run_phase4,
+}
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--mode", required=True, choices=list(MODES.keys()))
+    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--no-graphic", action="store_true")
+    args = parser.parse_args()
+    logger.info(f"Starting | mode={args.mode} | dry_run={args.dry_run}")
+    MODES[args.mode](dry_run=args.dry_run, no_graphic=args.no_graphic)
+    logger.info("Run complete.")
+
+
+if __name__ == "__main__":
+    main()
