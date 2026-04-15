@@ -4,12 +4,9 @@ from engine.bracket_core import TeamRecord, build_standard_1_to_8_bracket
 
 def build_nhl_bracket(records: List[TeamRecord]) -> List[Dict[str, str]]:
     """
-    Simplified NHL bracket builder.
-    Assumes:
-      - records already contain the 8 playoff teams per conference
-      - seeds already assigned (1–8)
+    Simplified: assumes records represent the 8 playoff teams per conference
+    (or full standings; we’ll rely on seeds already set).
     """
-
     east = [r for r in records if r.conference == "East"]
     west = [r for r in records if r.conference == "West"]
 
