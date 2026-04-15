@@ -53,6 +53,71 @@ from engine.highlight_generator import (
 from engine.playoff_engine import project_series
 from engine.playoff_formatter import format_league_overview, format_all_matchups
 from engine.bracket_auto import get_nba_playoff_matchups, get_nhl_playoff_matchups
+# ============================================================
+# EDGE EQUATION 3.0 — GLOBAL GAME START GUARDRAIL
+# ============================================================
+
+from datetime import timezone
+
+def game_has_started(play):
+    """
+    Returns True if the game has started or finished.
+    Works for all sports and all projection types.
+    """
+    status = (play.get("status") or "").lower()
+
+    # If API already marks it as live or final
+    if status in ("in_progress", "live", "final", "completed"):
+        return True
+
+    # Try to read start time
+    start = play.get("start_time") or play.get("game_time")
+    if not start:
+        return False
+
+    try:
+        if isinstance(start, str):
+            start_dt = datetime.fromisoformat(start.replace("Z", "+00:00"))
+        else:
+            start_dt = start
+
+        now = datetime.now(timezone.utc)
+        return now >= start_dt
+    except Exception:
+        return False
+# ============================================================
+# EDGE EQUATION 3.0 — GLOBAL GAME START GUARDRAIL
+# ============================================================
+
+from datetime import timezone
+
+def game_has_started(play):
+    """
+    Returns True if the game has started or finished.
+    Works for all sports and all projection types.
+    """
+    status = (play.get("status") or "").lower()
+
+    # If API already marks it as live or final
+    if status in ("in_progress", "live", "final", "completed"):
+        return True
+
+    # Try to read start time
+    start = play.get("start_time") or play.get("game_time")
+    if not start:
+        return False
+
+    try:
+        if isinstance(start, str):
+            start_dt = datetime.fromisoformat(start.replace("Z", "+00:00"))
+        else:
+            start_dt = start
+
+        now = datetime.now(timezone.utc)
+        return now >= start_dt
+    except Exception:
+        return False
+
 
 
 def _today():
@@ -263,6 +328,44 @@ def run_daily(dry_run, no_graphic):
     personal_pp = build_personal_prizepicks(all_plays)
     bankroll = get_bankroll_summary()
     all_time = build_all_time_stats(style="ee")
+    # ============================================================
+    # EDGE EQUATION 3.0 — APPLY GLOBAL GAME START GUARDRAIL
+    # ============================================================
+
+    def filter_started(games):
+        safe = []
+        for g in games:
+            if game_has_started(g):
+                logger.info(f"Skipping {g.get('matchup')} — already started or final")
+            else:
+                safe.append(g)
+        return safe
+
+    mlb_games = filter_started(mlb_games)
+    mlb_pitchers = filter_started(mlb_pitchers)
+    nba_games = filter_started(nba_games)
+    nhl_games = filter_started(nhl_games)
+    kbo_games = filter_started(kbo_games)
+    npb_games = filter_started(npb_games)
+    epl_games = filter_started(epl_games)
+    ucl_games = filter_started(ucl_games)
+        # ============================================================
+    # EDGE EQUATION 3.0 — VALIDATION LAYER
+    # ============================================================
+
+    def validate_projection(g):
+        if not g.get("vegas_total"):
+            logger.info(f"Skipping {g.get('matchup')} — missing Vegas line")
+            return False
+        if g.get("model_total") == g.get("vegas_total"):
+            logger.info(f"Skipping {g.get('matchup')} — duplicated model/market values")
+            return False
+        return True
+
+    mlb_games = [g for g in mlb_games if validate_projection(g)]
+    nba_games = [g for g in nba_games if validate_projection(g)]
+    nhl_games = [g for g in nhl_games if validate_projection(g)]
+
 
     if not dry_run:
         if mlb_games:
