@@ -1,6 +1,167 @@
 name: Edge Equation — Daily Automation
 
 on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Mode to run"
+        required: true
+        default: "daily"
+        type: choice
+        options:
+          - system_status
+          - gotd
+          - potd
+          - announce
+          - daily
+          - results
+          - weekly
+          - playoffs
+          - cbc_announce
+          - cbc_kbo
+          - cbc_npb
+          - cbc_epl
+          - cbc_results
+          - cbc_gotd
+          - cbc_potd
+          - scan_game
+          - scan_prop
+          - scan_nrfi
+          - weekly_reminder
+          - monthly_reminder
+          - phase2
+          - phase3
+          - phase4
+      dry_run:
+        description: "Dry run (no post or email)"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "true"
+          - "false"
+
+  schedule:
+    - cron: "0 14 * * *"     # system_status
+    - cron: "30 16 * * *"    # gotd
+    - cron: "45 16 * * *"    # potd
+    - cron: "30 17 * * *"    # daily
+    - cron: "30 5 * * *"     # results
+    - cron: "0 16 * * 0"     # weekly
+    - cron: "0 14 * * 1"     # weekly_reminder
+    - cron: "0 14 1 * *"     # monthly_reminder
+    - cron: "0 14 17 4 *"    # playoffs
+    - cron: "0 14 13 5 *"    # phase2
+    - cron: "0 14 13 6 *"    # phase3
+    - cron: "0 14 13 7 *"    # phase4
+
+jobs:
+
+  # ============================================================
+  # SYSTEM STATUS — 8:00 AM CST
+  # ============================================================
+  system_status:
+    if: github.event_name == 'schedule' && startsWith(github.event.schedule, '0 14')
+    uses: ./.github/workflows/edge_equation_job.yml
+    with:
+      run_mode: system_status
+
+  # ============================================================
+  # GOTD — 10:30 AM CST
+  # ============================================================
+  gotd:
+    if: github.event_name == 'schedule' && startsWith(github.event.schedule, '30 16')
+    uses: ./.github/workflows/edge_equation_job.yml
+    with:
+      run_mode: gotd
+
+  # ============================================================
+  # POTD — 10:45 AM CST
+  # ============================================================
+  potd:
+    if: github.event_name == 'schedule' && startsWith(github.event.schedule, '45 16')
+    uses: ./.github/workflows/edge_equation_job.yml
+    with:
+      run_mode: potd
+
+  # ============================================================
+  # DAILY — 11:30 AM CST
+  # ============================================================
+  daily:
+    if: github.event_name == 'schedule' && startsWith(github.event.schedule, '30 17')
+    uses: ./.github/workflows/edge_equation_job.yml
+    with:
+      run_mode: daily
+
+  # ============================================================
+  # RESULTS — 11:30 PM CST
+  # ============================================================
+  results:
+    if: github.event_name == 'schedule' && startsWith(github.event.schedule, '30 5')
+    uses: ./.github/workflows/edge_equation_job.yml
+    with:
+      run_mode: results
+
+  # ============================================================
+  # WEEKLY — Sunday 10 AM CST
+  # ============================================================
+  weekly:
+    if: github.event_name == 'schedule' && startsWith(github.event.schedule, '0 16')
+    uses: ./.github/workflows/edge_equation_job.yml
+    with:
+      run_mode: weekly
+
+  # ============================================================
+  # WEEKLY REMINDER — Monday 8 AM CST
+  # ============================================================
+  weekly_reminder:
+    if: github.event_name == 'schedule' && startsWith(github.event.schedule, '0 14') && github.event.schedule != '0 14 1 * *'
+    uses: ./.github/workflows/edge_equation_job.yml
+    with:
+      run_mode: weekly_reminder
+
+  # ============================================================
+  # MONTHLY REMINDER — 1st of month 8 AM CST
+  # ============================================================
+  monthly_reminder:
+    if: github.event_name == 'schedule' && github.event.schedule == '0 14 1 * *'
+    uses: ./.github/workflows/edge_equation_job.yml
+    with:
+      run_mode: monthly_reminder
+
+  # ============================================================
+  # PLAYOFFS — April 17
+  # ============================================================
+  playoffs:
+    if: github.event_name == 'schedule' && github.event.schedule == '0 14 17 4 *'
+    uses: ./.github/workflows/edge_equation_job.yml
+    with:
+      run_mode: playoffs
+
+  # ============================================================
+  # PHASE 2 / 3 / 4
+  # ============================================================
+  phase2:
+    if: github.event_name == 'schedule' && github.event.schedule == '0 14 13 5 *'
+    uses: ./.github/workflows/edge_equation_job.yml
+    with:
+      run_mode: phase2
+
+  phase3:
+    if: github.event_name == 'schedule' && github.event.schedule == '0 14 13 6 *'
+    uses: ./.github/workflows/edge_equation_job.yml
+    with:
+      run_mode: phase3
+
+  phase4:
+    if: github.event_name == 'schedule' && github.event.schedule == '0 14 13 7 *'
+    uses: ./.github/workflows/edge_equation_job.yml
+    with:
+      run_mode: phase4
+
+name: Edge Equation — Daily Automation
+
+on:
   schedule:
     # EE — 8:00 AM CST (14:00 UTC) system status
     - cron: "0 14 * * *"
