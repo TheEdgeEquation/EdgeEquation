@@ -411,10 +411,14 @@ def _build_prop_drivers(sport: str, prop: dict) -> dict:
     """Build driver fields for POTD template."""
     sport = sport.upper()
     player = prop.get("teams_or_player", prop.get("player", "Player"))
-    prop_type = prop.get("prop", prop.get("prop_label", "Prop"))
-    proj = prop.get("proj_value", prop.get("proj_total", "N/A"))
-    vegas = prop.get("vegas_line", "N/A")
+    prop_type = prop.get("prop", prop.get("prop_label", prop.get("prop_type", "Strikeouts")))
+    proj = prop.get("proj_value", prop.get("projected_ks", prop.get("proj_total", "N/A")))
+    vegas = prop.get("vegas_line", prop.get("line", "N/A"))
     edge = prop.get("edge_percent", "N/A")
+    try:
+        proj = str(round(float(proj), 1))
+    except (ValueError, TypeError):
+        pass
  
     return {
         "player": player,
