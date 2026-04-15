@@ -10,6 +10,8 @@ X_API_SECRET = os.getenv("X_API_SECRET", "")
 X_ACCESS_TOKEN = os.getenv("X_ACCESS_TOKEN", "")
 X_ACCESS_SECRET = os.getenv("X_ACCESS_SECRET", "")
  
+MAX_CHARS = 25000  # X Premium limit
+ 
  
 def _get_client():
     return tweepy.Client(
@@ -20,12 +22,13 @@ def _get_client():
     )
  
  
-def post_tweet(text, image_path=None, account="ee"):
+def post_tweet(text, image_path=None, account="ee", long_form=False):
     try:
         client = _get_client()
-        response = client.create_tweet(text=text[:280])
+        text = text[:MAX_CHARS]
+        response = client.create_tweet(text=text)
         tweet_id = response.data["id"]
-        logger.info("Tweet posted: " + str(tweet_id))
+        logger.info("Tweet posted: " + str(tweet_id) + " (" + str(len(text)) + " chars)")
         return tweet_id
     except Exception as e:
         logger.error("Tweet failed: " + str(e))
@@ -39,9 +42,12 @@ def post_thread(tweets, account="ee"):
         ids = []
         for text in tweets:
             if reply_to:
-                resp = client.create_tweet(text=text[:280], in_reply_to_tweet_id=reply_to)
+                resp = client.create_tweet(
+                    text=text[:MAX_CHARS],
+                    in_reply_to_tweet_id=reply_to
+                )
             else:
-                resp = client.create_tweet(text=text[:280])
+                resp = client.create_tweet(text=text[:MAX_CHARS])
             reply_to = resp.data["id"]
             ids.append(reply_to)
         logger.info("Thread posted: " + str(len(ids)) + " tweets")
@@ -52,26 +58,20 @@ def post_thread(tweets, account="ee"):
  
  
 def caption_announce():
-    date_str = datetime.now().strftime("%A, %B %-d")
-    return ("EDGE EQUATION — " + date_str + "\n\nScanning today's slate:\n\nMLB  NBA  NHL\nKBO  NPB  EPL\n\nProjections dropping shortly.\n\nThis is data. Not advice.\n\n#EdgeEquation")[:280]
+    from engine.content_generator import generate_system_status_post
+    return generate_system_status_post()
  
  
 def caption_results_ee(results):
-    if not results:
-        return "Results pending.\n\n#EdgeEquation"
     from engine.content_generator import generate_results_post
-    return generate_results_post(results)[:280]
+    return generate_results_post(results)
  
  
 def caption_weekly(stats):
-    wins = stats.get("wins", 0)
-    losses = stats.get("losses", 0)
-    win_rate = stats.get("win_rate", 0)
-    net = stats.get("net_units", 0)
-    prefix = "+" if net >= 0 else ""
-    return ("EDGE EQUATION — WEEK IN REVIEW\n\n" + str(wins) + "-" + str(losses) + " (" + str(win_rate) + "%)\n" + prefix + str(net) + "u\n\nEvery result posted.\nThis is data. Not advice.\n\n#EdgeEquation")[:280]
+    from engine.content_generator import generate_monday_accountability_thread
+    return generate_monday_accountability_thread(stats)
  
  
 def caption_no_play():
     from engine.content_generator import generate_no_play_post
-    return generate_no_play_post()[:280]
+    return generate_no_play_post()
