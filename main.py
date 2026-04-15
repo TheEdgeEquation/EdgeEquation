@@ -866,10 +866,10 @@ def run_high_confidence_outlier(dry_run, no_graphic):
         caption = header + "\n\n" + text
 
         if not dry_run:
-            post_tweet(caption)
-            logger.info("High-Confidence Outlier posted")
+            logger.info("[DRY RUN MODE ENABLED] High-Confidence Outlier would post:\n" + caption)
         else:
             logger.info("[DRY RUN] High-Confidence Outlier:\n" + caption)
+
     except Exception as e:
         logger.error("High-Confidence Outlier failed: " + str(e))
 
@@ -901,13 +901,15 @@ def run_secondary_alignment(dry_run, no_graphic):
         caption = header + "\n\n" + text
 
         if not dry_run:
-            post_tweet(caption)
-            logger.info("Secondary Alignment posted")
+            logger.info("[DRY RUN MODE ENABLED] Secondary Alignment would post:\n" + caption)
         else:
             logger.info("[DRY RUN] Secondary Alignment:\n" + caption)
+
     except Exception as e:
         logger.error("Secondary Alignment failed: " + str(e))
-        # ============================================================
+
+
+# ============================================================
 # EDGE EQUATION 3.0 — DAILY EMAIL MODE
 # ============================================================
 
@@ -968,10 +970,12 @@ def run_daily_email(dry_run, no_graphic):
         logger.info("[DRY RUN] 3.0 daily email would be sent")
 
 
-
-
+# ============================================================
+# UPDATED MODES DICTIONARY (3.0 + legacy modes)
+# ============================================================
 
 MODES = {
+    # Legacy modes (kept for compatibility)
     "system_status": run_system_status,
     "gotd": run_gotd,
     "potd": run_potd,
@@ -996,14 +1000,15 @@ MODES = {
     "phase2": run_phase2,
     "phase3": run_phase3,
     "phase4": run_phase4,
-        "model_notes": run_model_notes,
+
+    # NEW EDGE EQUATION 3.0 MODES
+    "model_notes": run_model_notes,
     "primary_signal": run_primary_signal,
     "prop_efficiency_signal": run_prop_efficiency_signal,
     "run_suppression_signal": run_run_suppression_signal,
     "high_confidence_outlier": run_high_confidence_outlier,
     "secondary_alignment": run_secondary_alignment,
     "daily_email": run_daily_email,
-
 }
 
 
@@ -1020,3 +1025,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
