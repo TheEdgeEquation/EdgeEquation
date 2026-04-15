@@ -1,5 +1,5 @@
 name: Cash Before Coffee — Nightly Automation
- 
+
 on:
   schedule:
     # CBC — 10:30 PM CST (3:30 UTC) nightly announce
@@ -12,7 +12,7 @@ on:
     - cron: "0 11 * * *"
     # CBC — 8:00 AM CST (13:00 UTC) overnight results
     - cron: "0 13 * * *"
- 
+
   workflow_dispatch:
     inputs:
       mode:
@@ -34,67 +34,67 @@ on:
         options:
           - "true"
           - "false"
- 
+
 jobs:
   run-cash-before-coffee:
     runs-on: ubuntu-latest
     timeout-minutes: 30
- 
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
- 
+
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
- 
+
       - name: Install dependencies
         run: pip install -r requirements.txt
- 
+
+      # ============================================================
+      # DRIFT-PROOF MODE SELECTOR (REPLACES OLD WINDOW LOGIC)
+      # ============================================================
       - name: Determine CBC mode from schedule
         run: |
           EVENT="${{ github.event_name }}"
-          DRY="${{ github.event.inputs.dry_run }}"
+          CRON_STRING="${{ github.event.schedule }}"
           INPUT_MODE="${{ github.event.inputs.mode }}"
- 
+          DRY="${{ github.event.inputs.dry_run }}"
+
+          echo "DRY_RUN_FLAG=" >> $GITHUB_ENV
+
           if [ "$EVENT" = "schedule" ]; then
-            echo "DRY_RUN_FLAG=" >> $GITHUB_ENV
-            HOUR=$(date -u +"%H")
-            MIN=$(date -u +"%M")
- 
-            # Use hour+minute window matching to handle GitHub cron drift
-            # 03:30 UTC = cbc_announce (window: 03:20–03:55)
-            # 04:00 UTC = cbc_kbo     (window: 03:56–04:20)
-            # 04:30 UTC = cbc_npb     (window: 04:21–04:55)
-            # 11:00 UTC = cbc_epl     (window: 10:45–11:45)
-            # 13:00 UTC = cbc_results  (window: 12:45–13:45)
- 
-            TOTAL_MIN=$((10#$HOUR * 60 + 10#$MIN))
- 
-            if [ "$TOTAL_MIN" -ge 200 ] && [ "$TOTAL_MIN" -le 235 ]; then
-              echo "RUN_MODE=cbc_announce" >> $GITHUB_ENV
-            elif [ "$TOTAL_MIN" -ge 236 ] && [ "$TOTAL_MIN" -le 260 ]; then
-              echo "RUN_MODE=cbc_kbo" >> $GITHUB_ENV
-            elif [ "$TOTAL_MIN" -ge 261 ] && [ "$TOTAL_MIN" -le 295 ]; then
-              echo "RUN_MODE=cbc_npb" >> $GITHUB_ENV
-            elif [ "$TOTAL_MIN" -ge 645 ] && [ "$TOTAL_MIN" -le 705 ]; then
-              echo "RUN_MODE=cbc_epl" >> $GITHUB_ENV
-            elif [ "$TOTAL_MIN" -ge 765 ] && [ "$TOTAL_MIN" -le 825 ]; then
-              echo "RUN_MODE=cbc_results" >> $GITHUB_ENV
-            else
-              echo "RUN_MODE=cbc_kbo" >> $GITHUB_ENV
-            fi
- 
+            echo "Triggered by schedule: $CRON_STRING"
+
+            case "$CRON_STRING" in
+              "30 3 * * *")
+                echo "RUN_MODE=cbc_announce" >> $GITHUB_ENV
+                ;;
+              "0 4 * * *")
+                echo "RUN_MODE=cbc_kbo" >> $GITHUB_ENV
+                ;;
+              "30 4 * * *")
+                echo "RUN_MODE=cbc_npb" >> $GITHUB_ENV
+                ;;
+              "0 11 * * *")
+                echo "RUN_MODE=cbc_epl" >> $GITHUB_ENV
+                ;;
+              "0 13 * * *")
+                echo "RUN_MODE=cbc_results" >> $GITHUB_ENV
+                ;;
+              *)
+                echo "RUN_MODE=cbc_kbo" >> $GITHUB_ENV
+                ;;
+            esac
+
           else
             echo "RUN_MODE=$INPUT_MODE" >> $GITHUB_ENV
             if [ "$DRY" = "true" ]; then
               echo "DRY_RUN_FLAG=--dry-run" >> $GITHUB_ENV
-            else
-              echo "DRY_RUN_FLAG=" >> $GITHUB_ENV
             fi
           fi
- 
+
       - name: Run Cash Before Coffee
         env:
           CBC_X_API_KEY:       ${{ secrets.CBC_X_API_KEY }}
