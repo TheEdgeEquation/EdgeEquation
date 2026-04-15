@@ -1,10 +1,27 @@
 import logging
-from datetime import datetime, date as date_type
-from engine.unified_formatter import build_edge_equation_post, format_edge_equation_post, choose_slate_type
+from datetime import datetime
  
 logger = logging.getLogger(__name__)
  
 ALGO_VERSION = "2.0"
+MAX_CHARS = 25000  # X Premium limit
+ 
+DIVIDER = "\u2501" * 25
+ 
+SPORT_EMOJI = {
+    "baseball_mlb": "\u26be",
+    "basketball_nba": "\U0001f3c0",
+    "icehockey_nhl": "\U0001f3d2",
+    "americanfootball_nfl": "\U0001f3c8",
+    "KBO": "\u26be",
+    "NPB": "\u26be",
+    "EPL": "\u26bd",
+    "UCL": "\u26bd",
+    "MLB": "\u26be",
+    "NBA": "\U0001f3c0",
+    "NHL": "\U0001f3d2",
+    "NFL": "\U0001f3c8",
+}
  
 DAILY_CTA = {
     0: "Follow the build. Week 1 of public calibration.",
@@ -17,14 +34,14 @@ DAILY_CTA = {
 }
  
 LEAGUE_CONFIG = {
-    "MLB": {"full": "Major League Baseball", "hashtag": "MajorLeagueBaseball", "night": True},
-    "NBA": {"full": "National Basketball Association", "hashtag": "NBA", "night": True},
-    "NHL": {"full": "National Hockey League", "hashtag": "NHL", "night": True},
-    "NFL": {"full": "National Football League", "hashtag": "NFL", "night": True},
-    "KBO": {"full": "Korean Baseball", "hashtag": "KoreanBaseball", "night": False},
-    "NPB": {"full": "Japanese Baseball", "hashtag": "JapaneseBaseball", "night": False},
-    "EPL": {"full": "English Premier League", "hashtag": "PremierLeague", "night": False},
-    "UCL": {"full": "UEFA Champions League", "hashtag": "ChampionsLeague", "night": False},
+    "MLB": {"full": "Major League Baseball", "hashtag": "MajorLeagueBaseball"},
+    "NBA": {"full": "National Basketball Association", "hashtag": "NBA"},
+    "NHL": {"full": "National Hockey League", "hashtag": "NHL"},
+    "NFL": {"full": "National Football League", "hashtag": "NFL"},
+    "KBO": {"full": "Korean Baseball", "hashtag": "KoreanBaseball"},
+    "NPB": {"full": "Japanese Baseball", "hashtag": "JapaneseBaseball"},
+    "EPL": {"full": "English Premier League", "hashtag": "PremierLeague"},
+    "UCL": {"full": "UEFA Champions League", "hashtag": "ChampionsLeague"},
 }
  
  
@@ -32,11 +49,15 @@ def get_daily_cta():
     return DAILY_CTA.get(datetime.now().weekday(), "No feelings. Just facts.")
  
  
-def get_mission_line():
-    return "This is data. Not advice."
+def _short(team):
+    return (team or "").split()[-1] if team else ""
  
  
-def _get_gap_indicator(model_total, vegas_total, threshold=0.4):
+def _emoji(league):
+    return SPORT_EMOJI.get(league, "\U0001f4ca")
+ 
+ 
+def _indicator(model_total, vegas_total, threshold=0.4):
     if vegas_total is None:
         return ""
     diff = model_total - vegas_total
@@ -44,200 +65,126 @@ def _get_gap_indicator(model_total, vegas_total, threshold=0.4):
         return " \u2191"
     elif diff <= -threshold:
         return " \u2193"
-    else:
-        return " ~"
+    return " ~"
  
  
-def _games_to_dicts_with_indicators(projections,
-                                     home_score_key="home_runs",
-                                     away_score_key="away_runs"):
-    games = []
-    for g in projections:
-        home = g.get("home_team", "")
-        away = g.get("away_team", "")
-        h_score = (g.get(home_score_key) or g.get("home_score") or
-                   g.get("home_goals") or g.get("home_runs", 0))
-        a_score = (g.get(away_score_key) or g.get("away_score") or
-                   g.get("away_goals") or g.get("away_runs", 0))
-        vegas_total = g.get("vegas_total", None)
-        model_total = round(float(h_score) + float(a_score), 1)
-        display_total = vegas_total if vegas_total else model_total
-        indicator = _get_gap_indicator(model_total, vegas_total)
-        if home and away:
-            games.append({
-                "team_a": away,
-                "team_b": home,
-                "a_score": float(a_score),
-                "b_score": float(h_score),
-                "total": float(display_total),
-                "indicator": indicator,
-            })
-    return games
+def _date():
+    return datetime.now().strftime("%B %-d")
  
  
-def _format_post_with_indicators(league_short, league_full, games,
-                                  slate_type, hashtag=None):
-    hashtag = hashtag or league_full.replace(" ", "")
-    date_str = datetime.now().strftime("%B %-d")
+def _footer(league_short, extra_tag=None):
+    cfg = LEAGUE_CONFIG.get(league_short, {})
+    hashtag = cfg.get("hashtag", league_short)
+    tags = ["#EdgeEquation", "#" + league_short]
+    if extra_tag:
+        tags.append("#" + extra_tag)
+    elif hashtag != league_short:
+        tags.append("#" + hashtag)
+    return "\n".join(["This is data. Not advice.", " ".join(tags)])
+ 
+ 
+def _build_game_post(league_short, slate_type, games,
+                     home_score_key="home_runs",
+                     away_score_key="away_runs"):
+    if not games:
+        return ""
+    emoji = _emoji(league_short)
+    cfg = LEAGUE_CONFIG.get(league_short, {})
+    full_name = cfg.get("full", league_short)
     lines = [
-        "EDGE EQUATION — " + league_short + " PROJECTIONS",
-        date_str + " | Algorithm v" + ALGO_VERSION,
-        league_full + " | " + slate_type,
+        "\U0001f4ca EDGE EQUATION \u2014 " + league_short + " PROJECTIONS",
+        _date() + " | Algorithm v" + ALGO_VERSION,
+        full_name + " | " + slate_type,
         "",
     ]
     for g in games:
-        a = g["a_score"]
-        b = g["b_score"]
-        total = g["total"]
-        indicator = g.get("indicator", "")
-        line = (
-            f"{g['team_a']} @ {g['team_b']}: "
-            f"{a:.1f} \u2014 {b:.1f} | Line: {total:.1f}{indicator}"
-        )
-        lines.append(line)
-    lines += [
-        "",
-        "This is data. Not advice.",
-        "Books are soft on " + league_short + ". The math shows why.",
-        "#" + league_short + " #" + hashtag,
-    ]
-    return "\n".join(lines)
- 
- 
-def generate_mlb_projection_post(projections, max_games=10):
-    if not projections:
-        return ""
-    cfg = LEAGUE_CONFIG["MLB"]
-    games = _games_to_dicts_with_indicators(projections[:max_games])
-    if not games:
-        return ""
-    return _format_post_with_indicators(
-        "MLB", cfg["full"], games,
-        "Tonight's Slate", cfg["hashtag"]
-    )
- 
- 
-def generate_pitcher_projection_post(pitcher_projections, max_pitchers=8):
-    if not pitcher_projections:
-        return ""
-    date_str = datetime.now().strftime("%B %-d")
-    lines = [
-        "EDGE EQUATION — MLB PITCHER PROJECTIONS",
-        date_str + " | Algorithm v" + ALGO_VERSION,
-        "Major League Baseball | Tonight's Slate",
-        "",
-    ]
-    for p in pitcher_projections[:max_pitchers]:
-        player = p.get("player", "")
-        proj_ks = p.get("projected_ks", 0)
-        swstr = p.get("swstr_pct", 0)
-        opp = (p.get("opponent", "") or "")[:3].upper()
+        h = float(g.get(home_score_key) or g.get("home_score") or
+                  g.get("home_goals") or g.get("home_runs") or 0)
+        a = float(g.get(away_score_key) or g.get("away_score") or
+                  g.get("away_goals") or g.get("away_runs") or 0)
+        vt = g.get("vegas_total")
+        mt = round(a + h, 1)
+        dt = vt if vt is not None else mt
+        ind = _indicator(mt, vt)
+        away_name = g.get("away_team", "")
+        home_name = g.get("home_team", "")
         lines.append(
-            player + " vs " + opp + ": " +
-            str(proj_ks) + " K projected | SwStr% " + str(swstr) + "%"
+            emoji + " " + away_name + " @ " + home_name +
+            ":  " + f"{a:.1f} \u2014 {h:.1f}" +
+            "  |  Line: " + f"{dt:.1f}" + ind
         )
-    lines += ["", "This is data. Not advice.", "#MLB #MajorLeagueBaseball"]
-    return "\n".join(lines)
+    lines += ["", DIVIDER, "", _footer(league_short), ""]
+    return "\n".join(lines)[:MAX_CHARS]
  
  
-def generate_nba_projection_post(projections, player_projections=None, max_games=6):
-    if not projections:
-        return ""
-    cfg = LEAGUE_CONFIG["NBA"]
-    games = _games_to_dicts_with_indicators(
-        projections[:max_games], home_score_key="home_score", away_score_key="away_score"
-    )
-    if not games:
-        return ""
-    return _format_post_with_indicators(
-        "NBA", cfg["full"], games,
-        "Tonight's Slate", cfg["hashtag"]
-    )
+def generate_mlb_projection_post(projections, max_games=None):
+    return _build_game_post("MLB", "Tonight's Slate", projections or [])
  
  
-def generate_nhl_projection_post(projections, player_projections=None, max_games=6):
-    if not projections:
-        return ""
-    cfg = LEAGUE_CONFIG["NHL"]
-    games = _games_to_dicts_with_indicators(
-        projections[:max_games], home_score_key="home_goals", away_score_key="away_goals"
-    )
-    if not games:
-        return ""
-    return _format_post_with_indicators(
-        "NHL", cfg["full"], games,
-        "Tonight's Slate", cfg["hashtag"]
-    )
+def generate_nba_projection_post(projections, player_projections=None, max_games=None):
+    return _build_game_post("NBA", "Tonight's Slate", projections or [],
+                             "home_score", "away_score")
+ 
+ 
+def generate_nhl_projection_post(projections, player_projections=None, max_games=None):
+    return _build_game_post("NHL", "Tonight's Slate", projections or [],
+                             "home_goals", "away_goals")
  
  
 def generate_kbo_projection_post(projections):
-    if not projections:
-        return ""
-    cfg = LEAGUE_CONFIG["KBO"]
-    games = _games_to_dicts_with_indicators(projections)
-    if not games:
-        return ""
-    return _format_post_with_indicators(
-        "KBO", cfg["full"], games,
-        "Tomorrow's Slate", cfg["hashtag"]
-    )
+    return _build_game_post("KBO", "Tomorrow's Slate", projections or [])
  
  
 def generate_npb_projection_post(projections):
-    if not projections:
-        return ""
-    cfg = LEAGUE_CONFIG["NPB"]
-    games = _games_to_dicts_with_indicators(projections)
-    if not games:
-        return ""
-    return _format_post_with_indicators(
-        "NPB", cfg["full"], games,
-        "Tomorrow's Slate", cfg["hashtag"]
-    )
+    return _build_game_post("NPB", "Tomorrow's Slate", projections or [])
  
  
 def generate_epl_projection_post(projections):
-    if not projections:
-        return ""
-    cfg = LEAGUE_CONFIG["EPL"]
-    games = _games_to_dicts_with_indicators(
-        projections, home_score_key="home_goals", away_score_key="away_goals"
-    )
-    if not games:
-        return ""
-    return _format_post_with_indicators(
-        "EPL", cfg["full"], games,
-        "Tomorrow's Slate", cfg["hashtag"]
-    )
+    return _build_game_post("EPL", "Tomorrow's Slate", projections or [],
+                             "home_goals", "away_goals")
  
  
 def generate_ucl_projection_post(projections):
-    if not projections:
+    return _build_game_post("UCL", "Tomorrow's Slate", projections or [],
+                             "home_goals", "away_goals")
+ 
+ 
+def generate_pitcher_projection_post(pitcher_projections, max_pitchers=None):
+    if not pitcher_projections:
         return ""
-    cfg = LEAGUE_CONFIG["UCL"]
-    games = _games_to_dicts_with_indicators(
-        projections, home_score_key="home_goals", away_score_key="away_goals"
-    )
-    if not games:
-        return ""
-    return _format_post_with_indicators(
-        "UCL", cfg["full"], games,
-        "Tomorrow's Slate", cfg["hashtag"]
-    )
+    lines = [
+        "\U0001f4ca EDGE EQUATION \u2014 PITCHER PROJECTIONS",
+        _date() + " | Algorithm v" + ALGO_VERSION,
+        "Major League Baseball | Tonight's Slate",
+        "",
+    ]
+    for p in (pitcher_projections or []):
+        player = p.get("player", "")
+        proj_ks = p.get("projected_ks", 0)
+        swstr = p.get("swstr_pct", 0)
+        opp = p.get("opponent", "")
+        lines.append(
+            "\u26be " + player + " vs " + opp +
+            ":  " + str(proj_ks) + " K projected" +
+            ("  |  SwStr% " + str(swstr) + "%" if swstr else "")
+        )
+    lines += ["", DIVIDER, "", _footer("MLB"), ""]
+    return "\n".join(lines)[:MAX_CHARS]
  
  
 def generate_nrfi_probability_post(nrfi_plays):
     if not nrfi_plays:
         return ""
-    date_str = datetime.now().strftime("%B %-d")
     lines = [
-        "EDGE EQUATION — FIRST INNING PROBABILITIES",
-        date_str + " | Algorithm v" + ALGO_VERSION,
+        "\U0001f4ca EDGE EQUATION \u2014 FIRST INNING PROBABILITIES",
+        _date() + " | Algorithm v" + ALGO_VERSION,
         "Major League Baseball | Tonight's Slate",
+        "",
+        "Model inputs: pitcher ERA + offense + umpire + weather",
         "",
     ]
     shown = set()
-    for play in nrfi_plays[:8]:
+    for play in nrfi_plays:
         team = play.get("team", "")
         opp = play.get("opponent", "")
         key = opp + "@" + team
@@ -247,15 +194,48 @@ def generate_nrfi_probability_post(nrfi_plays):
         nrfi_prob = (play.get("sim_prob", 0.6) if play.get("prop_label") == "NRFI"
                      else round(1 - play.get("sim_prob", 0.4), 3))
         yrfi_prob = round(1 - nrfi_prob, 3)
-        t = (team.split()[-1] if team else "")[:10]
-        o = (opp.split()[-1] if opp else "")[:10]
+        home_era = play.get("home_era", "")
+        away_era = play.get("away_era", "")
+        pitcher_info = ""
+        if home_era and away_era:
+            pitcher_info = "  |  ERAs: " + str(round(away_era, 2)) + " / " + str(round(home_era, 2))
         lines.append(
-            o + " @ " + t + ": NRFI " +
-            str(round(nrfi_prob * 100, 1)) + "% | YRFI " +
-            str(round(yrfi_prob * 100, 1)) + "%"
+            "\u26be " + opp + " @ " + team +
+            ":  NRFI " + str(round(nrfi_prob * 100, 1)) +
+            "%  |  YRFI " + str(round(yrfi_prob * 100, 1)) + "%" +
+            pitcher_info
         )
-    lines += ["", "This is data. Not advice.", "#MLB #MajorLeagueBaseball"]
-    return "\n".join(lines)
+    lines += ["", DIVIDER, "", _footer("MLB"), ""]
+    return "\n".join(lines)[:MAX_CHARS]
+ 
+ 
+def generate_system_status_post():
+    return "\n".join([
+        "\U0001f4ca EDGE EQUATION \u2014 " + _date(),
+        "",
+        "\U0001f9ee System online.",
+        "Scanning today's full slate:",
+        "",
+        "\u26be MLB  \U0001f3c0 NBA  \U0001f3d2 NHL  \U0001f3c8 NFL",
+        "\U0001f30d KBO  NPB  EPL  UCL",
+        "",
+        "What we scan:",
+        "  \u26be Pitcher strikeouts | 9-layer model",
+        "  \u26be NRFI / YRFI probabilities",
+        "  \u26be Game totals vs Vegas lines",
+        "  \U0001f3c0 Player props | Usage + pace + defense",
+        "  \U0001f3d2 Shots on goal | SOG/60 + ice time",
+        "  \U0001f30d Overseas markets | KBO NPB EPL UCL",
+        "",
+        "Game of the Day and Player of the Day",
+        "drop before projections.",
+        "",
+        DIVIDER,
+        "",
+        get_daily_cta(),
+        "",
+        "#EdgeEquation #SportsAnalytics",
+    ])[:MAX_CHARS]
  
  
 def generate_results_post(results, style="ee"):
@@ -266,59 +246,88 @@ def generate_results_post(results, style="ee"):
         return "Results still coming in.\n\n#EdgeEquation"
     wins = sum(1 for r in verified if r.get("won"))
     losses = len(verified) - wins
-    date_str = datetime.now().strftime("%B %-d")
-    lines = ["EDGE EQUATION \u2014 " + date_str + " RESULTS", ""]
-    for r in verified[:5]:
+    win_rate = round(wins / len(verified) * 100, 1) if verified else 0
+    lines = [
+        "\U0001f4ca EDGE EQUATION \u2014 " + _date() + " RESULTS",
+        "",
+    ]
+    for r in verified:
         player = r.get("player", "")
         dl = r.get("display_line", "")
         prop = r.get("prop_label", "")
         won = r.get("won")
         actual = r.get("actual_result", "")
+        grade = r.get("grade", "")
         symbol = "\u2705" if won else "\u274c"
-        actual_str = " | Actual: " + str(actual) if actual else ""
-        lines.append(symbol + " " + player + " " + dl + " " + prop + actual_str)
-    lines += ["", str(wins) + "-" + str(losses) + " today", ""]
+        actual_str = "  |  Actual: " + str(actual) if actual else ""
+        grade_str = "  |  " + grade if grade else ""
+        lines.append(symbol + " " + player + " " + dl + " " + prop + grade_str + actual_str)
+    lines += [
+        "",
+        DIVIDER,
+        "",
+        "\U0001f4c8 Today: " + str(wins) + "-" + str(losses) + " (" + str(win_rate) + "%)",
+        "",
+    ]
     if wins > losses:
         lines.append("Edge confirmed.")
     elif wins == losses:
         lines.append("Split day. The model keeps running.")
     else:
-        lines.append("Tough day. Every result posted.")
-    lines += ["", "This is data. Not advice.", "#EdgeEquation"]
-    return "\n".join(lines)
+        lines.append("Tough day. Every result posted. No hiding.")
+    lines += [
+        "",
+        "This is data. Not advice.",
+        "#EdgeEquation #Results",
+    ]
+    return "\n".join(lines)[:MAX_CHARS]
  
  
 def generate_no_play_post():
-    date_str = datetime.now().strftime("%B %-d")
     return "\n".join([
-        "EDGE EQUATION \u2014 " + date_str,
+        "\U0001f4ca EDGE EQUATION \u2014 " + _date(),
         "",
-        "The model evaluated every available market today.",
+        "\U0001f9ee The model evaluated every available market.",
         "",
-        "No significant edge identified.",
+        "No significant edge identified today.",
+        "",
+        "Markets evaluated:",
+        "  \u26be MLB pitcher strikeouts",
+        "  \u26be NRFI / YRFI",
+        "  \U0001f3c0 NBA player props",
+        "  \U0001f3d2 NHL shots on goal",
+        "  \U0001f30d Overseas markets",
         "",
         "We do not force plays.",
         "We wait for the math.",
         "",
+        DIVIDER,
+        "",
         get_daily_cta(),
+        "",
         "#EdgeEquation",
-    ])
+    ])[:MAX_CHARS]
  
  
 def generate_weekly_poll():
     return "\n".join([
-        "The algorithm ran projections across all sports this week.",
+        "\U0001f4ca EDGE EQUATION \u2014 WEEKLY POLL",
         "",
+        "The algorithm ran projections across all sports this week.",
         "Which breakdown do you want to see?",
         "",
-        "MLB \u2014 Pitcher model deep dive",
-        "NBA \u2014 Scoring model breakdown",
-        "NHL \u2014 SOG model breakdown",
-        "KBO \u2014 Korean Baseball analysis",
+        "\u26be MLB \u2014 Pitcher model deep dive",
+        "\U0001f3c0 NBA \u2014 Scoring model breakdown",
+        "\U0001f3d2 NHL \u2014 SOG model breakdown",
+        "\U0001f30d KBO \u2014 Korean Baseball analysis",
+        "ALL \u2014 Show me everything",
+        "",
+        DIVIDER,
         "",
         get_daily_cta(),
-        "#EdgeEquation",
-    ])
+        "",
+        "#EdgeEquation #SportsAnalytics",
+    ])[:MAX_CHARS]
  
  
 def generate_monday_accountability_thread(stats, week_num=1):
@@ -328,26 +337,45 @@ def generate_monday_accountability_thread(stats, week_num=1):
     net_units = stats.get("net_units", 0)
     roi = stats.get("roi", 0)
     by_grade = stats.get("by_grade", {})
+    by_sport = stats.get("by_sport", {})
     prefix = "+" if net_units >= 0 else ""
     lines = [
-        "EDGE EQUATION \u2014 WEEK " + str(week_num) + " ACCOUNTABILITY",
-        datetime.now().strftime("%B %-d, %Y"),
+        "\U0001f4ca EDGE EQUATION \u2014 WEEK " + str(week_num) + " ACCOUNTABILITY",
+        _date(),
         "",
-        "Record: " + str(wins) + "-" + str(losses) + " (" + str(win_rate) + "%)",
+        "\U0001f4c8 Record: " + str(wins) + "-" + str(losses) + " (" + str(win_rate) + "%)",
         "Net units: " + prefix + str(net_units) + "u",
         "ROI: " + prefix + str(roi) + "%",
         "",
+        DIVIDER,
+        "",
+        "By grade:",
     ]
     for grade in ("A+", "A", "A-"):
         g = by_grade.get(grade, {})
         if g.get("total", 0) > 0:
             lines.append(
-                grade + ": " + str(g["wins"]) + "-" +
+                "  " + grade + ": " + str(g["wins"]) + "-" +
                 str(g["total"] - g["wins"]) + " (" + str(g["win_rate"]) + "%)"
             )
-    lines += ["", "Every result posted. No exceptions.",
-              "This is data. Not advice.", "#EdgeEquation"]
-    return "\n".join(lines)
+    if by_sport:
+        lines += ["", "By sport:"]
+        for sport, data in by_sport.items():
+            if data.get("total", 0) > 0:
+                lines.append(
+                    "  " + sport + ": " + str(data["wins"]) + "-" +
+                    str(data["total"] - data["wins"]) + " (" + str(data["win_rate"]) + "%)"
+                )
+    lines += [
+        "",
+        DIVIDER,
+        "",
+        "Every result posted. No exceptions.",
+        "This is data. Not advice.",
+        "",
+        "#EdgeEquation #Transparency",
+    ]
+    return "\n".join(lines)[:MAX_CHARS]
  
  
 def generate_monthly_calibration_thread(stats, month_num=1):
@@ -356,91 +384,166 @@ def generate_monthly_calibration_thread(stats, month_num=1):
     win_rate = stats.get("win_rate", 0)
     roi = stats.get("roi", 0)
     avg_clv = stats.get("avg_clv", 0)
+    model_accuracy = stats.get("model_accuracy", 0)
     by_grade = stats.get("by_grade", {})
+    by_sport = stats.get("by_sport", {})
     lines = [
-        "EDGE EQUATION \u2014 MONTH " + str(month_num) + " CALIBRATION",
+        "\U0001f4ca EDGE EQUATION \u2014 MONTH " + str(month_num) + " CALIBRATION REPORT",
         datetime.now().strftime("%B %Y"),
         "",
-        "Graded plays: " + str(total),
-        "Record: " + str(wins) + "-" + str(total - wins) + " (" + str(win_rate) + "%)",
+        "\U0001f9ee Total projections evaluated: running",
+        "\U0001f9ee Total graded plays: " + str(total),
+        "\U0001f4c8 Record: " + str(wins) + "-" + str(total - wins) + " (" + str(win_rate) + "%)",
         "ROI: " + ("+" if roi >= 0 else "") + str(roi) + "%",
-        "Closing line value: +" + str(avg_clv) + "% avg",
+        "Avg closing line value: +" + str(avg_clv) + "%",
         "",
+        DIVIDER,
+        "",
+        "By grade:",
     ]
     for grade in ("A+", "A", "A-"):
         g = by_grade.get(grade, {})
         if g.get("total", 0) > 0:
             lines.append(
-                grade + ": " + str(g["wins"]) + "-" +
+                "  " + grade + ": " + str(g["wins"]) + "-" +
                 str(g["total"] - g["wins"]) + " (" + str(g["win_rate"]) + "%)"
             )
-    lines += ["", "The model is learning.",
-              "This is data. Not advice.", "#EdgeEquation"]
-    return "\n".join(lines)
+    if by_sport:
+        lines += ["", "By sport:"]
+        for sport, data in by_sport.items():
+            if data.get("total", 0) > 0:
+                lines.append(
+                    "  " + sport + ": " + str(data["wins"]) + "-" +
+                    str(data["total"] - data["wins"]) + " (" + str(data["win_rate"]) + "%)"
+                )
+    lines += [
+        "",
+        DIVIDER,
+        "",
+        "The model is learning.",
+        "The edge is real.",
+        "",
+        "This is data. Not advice.",
+        "",
+        "#EdgeEquation #Transparency #Calibration",
+    ]
+    return "\n".join(lines)[:MAX_CHARS]
  
  
 def generate_model_vs_vegas_post(plays):
     if not plays:
         return ""
-    date_str = datetime.now().strftime("%B %-d")
-    lines = ["EDGE EQUATION \u2014 MODEL vs VEGAS", date_str, ""]
-    for play in plays[:5]:
+    lines = [
+        "\U0001f4ca EDGE EQUATION \u2014 MODEL vs VEGAS",
+        _date(),
+        "",
+        "\U0001f9ee Our projections vs opening lines:",
+        "",
+    ]
+    for play in plays:
         player = play.get("player", "")
         prop = play.get("prop_label", "")
         proj = round(play.get("true_lambda", 0), 1)
         line = play.get("line", 0)
         diff = round(proj - line, 1)
-        symbol = "+" if diff >= 0 else ""
-        indicator = " \u2191" if diff >= 0.4 else (" \u2193" if diff <= -0.4 else " ~")
+        ind = " \u2191" if diff >= 0.4 else (" \u2193" if diff <= -0.4 else " ~")
+        prefix = "+" if diff >= 0 else ""
         lines.append(
-            player + " " + prop + ": Model " + str(proj) +
-            " | Market " + str(line) + indicator
+            "\u26be " + player + " " + prop +
+            ":  Model " + str(proj) +
+            "  |  Market " + str(line) +
+            "  (" + prefix + str(diff) + ")" + ind
         )
-    lines += ["", "We act when the gap is significant.",
-              "This is data. Not advice.", "#EdgeEquation"]
-    return "\n".join(lines)
+    lines += [
+        "",
+        DIVIDER,
+        "",
+        "We act when the gap is significant.",
+        "This is data. Not advice.",
+        "",
+        "#EdgeEquation #ModelVsVegas",
+    ]
+    return "\n".join(lines)[:MAX_CHARS]
  
  
 def generate_origin_story_post():
     return "\n".join([
-        "EDGE EQUATION",
+        "\U0001f4ca EDGE EQUATION",
         "",
         "We built a sports analytics engine from scratch.",
         "",
+        DIVIDER,
+        "",
         "What's inside:",
         "",
-        "9-layer MLB pitcher model",
-        "Baseball Savant SwStr% integration",
-        "Live weather per stadium",
-        "Umpire strike zone data",
-        "Today's lineup and platoon splits",
-        "10,000 Monte Carlo simulations per play",
-        "Kelly Criterion bet sizing",
-        "NBA / NHL / NFL / KBO / NPB / EPL models",
+        "\u26be 9-layer MLB pitcher model",
+        "   K/9 blended + SwStr% + platoon splits",
+        "   weather + umpire + park + altitude",
+        "   opponent K rate + pitch mix",
+        "",
+        "\U0001f9ee Baseball Savant SwStr% integration",
+        "   Swinging strike rate is the single best",
+        "   predictor of strikeouts. Books underweight it.",
+        "   We built it into the core model.",
+        "",
+        "\U0001f9ee Live weather per stadium",
+        "   OpenWeatherMap API. Real time.",
+        "   Temperature and wind affect run environment.",
+        "",
+        "\U0001f9ee Umpire strike zone data",
+        "   HP umpire grades above or below average.",
+        "   Small but consistent signal.",
+        "",
+        "\U0001f9ee Lineup and platoon splits",
+        "   Today's lineup handedness vs pitcher.",
+        "   Not last year's data. Today's.",
+        "",
+        "\U0001f9ee 10,000 Monte Carlo simulations",
+        "   Poisson distribution.",
+        "   Edge = sim probability minus implied probability.",
+        "",
+        "\U0001f9ee Kelly Criterion bet sizing",
+        "   Eighth Kelly during calibration.",
+        "   Quarter Kelly after 30 days proven.",
+        "",
+        "\U0001f3c0 NBA player props",
+        "   Usage + pace + opponent defense + rest",
+        "",
+        "\U0001f3d2 NHL shots on goal",
+        "   SOG/60 + ice time + PP time + opponent",
+        "",
+        "\U0001f30d KBO / NPB / EPL / UCL overnight",
+        "   The algorithm runs while America sleeps.",
+        "",
+        DIVIDER,
         "",
         "We are not posting picks yet.",
         "",
         "First we show you the engine works.",
-        "Every projection. Every result.",
-        "Public. Transparent.",
+        "Every projection. Every result. Public.",
+        "Including the misses.",
         "",
         get_daily_cta(),
-        "#EdgeEquation",
-    ])
+        "",
+        "#EdgeEquation #BuildingInPublic #SportsAnalytics",
+    ])[:MAX_CHARS]
  
  
 def generate_weather_alert_post(play, old_weather, new_weather):
     player = play.get("player", "")
     prop = play.get("prop_label", "K")
+    home_team = play.get("home_team", "the venue")
     return "\n".join([
-        "EDGE EQUATION \u2014 WEATHER UPDATE",
-        datetime.now().strftime("%B %-d"),
+        "\U0001f4ca EDGE EQUATION \u2014 WEATHER UPDATE",
+        _date(),
         "",
-        "Conditions changed at " + (play.get("home_team", "") or "the venue") + ":",
+        "Conditions changed at " + home_team + ":",
+        "",
         "Before: " + str(old_weather),
-        "After: " + str(new_weather),
+        "After:  " + str(new_weather),
         "",
-        player + " " + prop + " projection adjusted.",
+        "\u26be " + player + " " + prop + " projection adjusted.",
         "The model updates in real time.",
-        "#EdgeEquation",
-    ])
+        "",
+        "#EdgeEquation #WeatherAlert",
+    ])[:MAX_CHARS]
