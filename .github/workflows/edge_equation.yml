@@ -1,140 +1,44 @@
-name: Edge Equation — Daily Automation
+name: Edge Equation — TEMP SAFE MODE
 
 on:
-  schedule:
-    # EE – 8:00 AM CST (14:00 UTC) system status
-    - cron: "0 14 * * *"
-    # EE – 10:30 AM CST (16:30 UTC) GOTD
-    - cron: "30 16 * * *"
-    # EE – 10:45 AM CST (16:45 UTC) POTD
-    - cron: "45 16 * * *"
-    # EE – 11:30 AM CST (17:30 UTC) daily projections
-    - cron: "30 17 * * *"
-    # EE – 11:30 PM CST (05:30 UTC next day) results
-    - cron: "30 5 * * *"
-    # EE – Sunday 10 AM CST (16:00 UTC) weekly roundup
-    - cron: "0 16 * * 0"
-    # EE – Monday 8 AM CST (14:00 UTC) weekly reminder
-    - cron: "0 14 * * 1"
-    # EE – 1st of month 8 AM CST (14:00 UTC) monthly reminder
-    - cron: "0 14 1 * *"
-    # EE – NBA/NHL playoffs
-    - cron: "0 14 17 4 *"
-    # Phase transitions
-    - cron: "0 14 13 5 *"
-    - cron: "0 14 13 6 *"
-    - cron: "0 14 13 7 *"
-
   workflow_dispatch:
     inputs:
       mode:
         description: "Mode to run"
         required: true
         default: "daily"
-        type: choice
-        options:
-          - system_status
-          - gotd
-          - potd
-          - announce
-          - daily
-          - results
-          - weekly
-          - playoffs
-          - cbc_announce
-          - cbc_kbo
-          - cbc_npb
-          - cbc_epl
-          - cbc_results
-          - cbc_gotd
-          - cbc_potd
-          - scan_game
-          - scan_prop
-          - scan_nrfi
-          - weekly_reminder
-          - monthly_reminder
-          - phase2
-          - phase3
-          - phase4
       dry_run:
-        description: "Dry run (no post or email)"
+        description: "Dry run"
         required: false
-        default: "false"
-        type: choice
-        options:
-          - "true"
-          - "false"
+        default: "true"
 
 jobs:
+  run:
+    runs-on: ubuntu-latest
 
-  system_status:
-    if: github.event_name == 'schedule' && github.event.schedule == '0 14 * * *'
-    uses: ./.github/workflows/edge_equation_job.yml
-    with:
-      run_mode: system_status
+    steps:
+      - uses: actions/checkout@v4
 
-  gotd:
-    if: github.event_name == 'schedule' && github.event.schedule == '30 16 * * *'
-    uses: ./.github/workflows/edge_equation_job.yml
-    with:
-      run_mode: gotd
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-  potd:
-    if: github.event_name == 'schedule' && github.event.schedule == '45 16 * * *'
-    uses: ./.github/workflows/edge_equation_job.yml
-    with:
-      run_mode: potd
+      - run: pip install -r requirements.txt
 
-  daily:
-    if: github.event_name == 'schedule' && github.event.schedule == '30 17 * * *'
-    uses: ./.github/workflows/edge_equation_job.yml
-    with:
-      run_mode: daily
-
-  results:
-    if: github.event_name == 'schedule' && github.event.schedule == '30 5 * * *'
-    uses: ./.github/workflows/edge_equation_job.yml
-    with:
-      run_mode: results
-
-  weekly:
-    if: github.event_name == 'schedule' && github.event.schedule == '0 16 * * 0'
-    uses: ./.github/workflows/edge_equation_job.yml
-    with:
-      run_mode: weekly
-
-  weekly_reminder:
-    if: github.event_name == 'schedule' && github.event.schedule == '0 14 * * 1'
-    uses: ./.github/workflows/edge_equation_job.yml
-    with:
-      run_mode: weekly_reminder
-
-  monthly_reminder:
-    if: github.event_name == 'schedule' && github.event.schedule == '0 14 1 * *'
-    uses: ./.github/workflows/edge_equation_job.yml
-    with:
-      run_mode: monthly_reminder
-
-  playoffs:
-    if: github.event_name == 'schedule' && github.event.schedule == '0 14 17 4 *'
-    uses: ./.github/workflows/edge_equation_job.yml
-    with:
-      run_mode: playoffs
-
-  phase2:
-    if: github.event_name == 'schedule' && github.event.schedule == '0 14 13 5 *'
-    uses: ./.github/workflows/edge_equation_job.yml
-    with:
-      run_mode: phase2
-
-  phase3:
-    if: github.event_name == 'schedule' && github.event.schedule == '0 14 13 6 *'
-    uses: ./.github/workflows/edge_equation_job.yml
-    with:
-      run_mode: phase3
-
-  phase4:
-    if: github.event_name == 'schedule' && github.event.schedule == '0 14 13 7 *'
-    uses: ./.github/workflows/edge_equation_job.yml
-    with:
-      run_mode: phase4
+      - name: Run EdgeEquation
+        env:
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+          MMA_API_KEY: ${{ secrets.MMA_API_KEY }}
+          X_API_KEY: ${{ secrets.X_API_KEY }}
+          X_API_SECRET: ${{ secrets.X_API_SECRET }}
+          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
+          X_ACCESS_SECRET: ${{ secrets.X_ACCESS_SECRET }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          EMAIL_SMTP: ${{ secrets.EMAIL_SMTP }}
+          OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
+          FOOTBALL_DATA_KEY: ${{ secrets.FOOTBALL_DATA_KEY }}
+        run: |
+          echo "Running mode=${{ github.event.inputs.mode }}"
+          python main.py --mode ${{ github.event.inputs.mode }} --dry-run
