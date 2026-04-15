@@ -313,7 +313,9 @@ def generate_gotd(sport: str, game: dict) -> str | None:
         # Build driver placeholders from game data or use defaults
         drivers = _build_drivers(sport, game)
         text = template.format(**drivers)
-        logger.info(f"[GOTD] Generated for {sport}: {game.get('away','?')} @ {game.get('home','?')}")
+        away_log = game.get("away_team", game.get("away", "?"))
+        home_log = game.get("home_team", game.get("home", "?"))
+        logger.info(f"[GOTD] Generated for {sport}: {away_log} @ {home_log}")
         return text
     except KeyError as e:
         logger.warning(f"[GOTD] Missing field {e} for {sport}")
