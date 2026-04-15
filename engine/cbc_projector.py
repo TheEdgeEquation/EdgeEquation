@@ -384,27 +384,24 @@ def format_kbo_projection_post(projections):
 def format_npb_projection_post(projections):
     if not projections:
         return ""
-    date_str = datetime.now().strftime("%B %d")
+
+    # Only take the first game (NPB slates are small)
+    g = projections[0]
+
+    home = g.get("home_team", "")
+    away = g.get("away_team", "")
+    home_r = g.get("home_runs", 0)
+    away_r = g.get("away_runs", 0)
+    total = g.get("total", 0)
+
     lines = [
-        "CASH BEFORE COFFEE — NPB PROJECTIONS",
-        date_str + "  |  Algorithm v2.0",
-        "Japanese Baseball  |  Games playing now",
-        "",
+        f"NPB | {home} vs {away}",
+        f"Proj: {home_r}-{away_r} | Total {total}",
+        f"Model edge: {round(abs(home_r - away_r), 2)}",
     ]
-    for g in projections[:6]:
-        home = g.get("home_team", "")
-        away = g.get("away_team", "")
-        home_r = g.get("home_runs", 0)
-        away_r = g.get("away_runs", 0)
-        total = g.get("total", 0)
-        lines.append(away + " @ " + home + ":  " + str(away_r) + " — " + str(home_r) + "  |  Total: " + str(total))
-    lines += [
-        "",
-        "This is data. Not advice.",
-        "The algorithm runs while America sleeps.",
-        "#CashBeforeCoffee #NPB #JapaneseBaseball",
-    ]
+
     return "\n".join(lines)
+
  
  
 def format_cbc_results_post(results):
