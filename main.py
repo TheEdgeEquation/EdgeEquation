@@ -31,13 +31,30 @@ from engine.gotd_potd_generator import generate_gotd, generate_potd, find_top_ga
 from engine.results_tracker import build_daily_summary, build_ytd_summary
 from post_to_x import post_tweet, post_thread, caption_announce, caption_cbc_announce, caption_results_ee, caption_weekly, caption_no_play
  
+SPORT_MAP = {
+    "baseball_mlb": "MLB",
+    "basketball_nba": "NBA",
+    "icehockey_nhl": "NHL",
+    "americanfootball_nfl": "NFL",
+    "basketball_wnba": "WNBA",
+    "americanfootball_ncaaf": "NCAAF",
+    "basketball_ncaab": "NCAAB",
+    "baseball_kbo": "KBO",
+    "baseball_npb": "NPB",
+    "soccer_epl": "EPL",
+    "soccer_uefa_champs_league": "UCL",
+}
+ 
  
 def _today():
     return datetime.now().strftime("%Y%m%d")
  
  
+def _normalize_sport(raw: str) -> str:
+    return SPORT_MAP.get(raw, raw.upper())
+ 
+ 
 def _post_safe(text, account, post_type, brand, state, dry_run):
-    """Post to X with brand validation and state tracking."""
     validated = validate_or_abort(text, post_type)
     if not validated:
         logger.warning(f"[{post_type}] Brand validation failed — aborted")
@@ -72,16 +89,12 @@ def _fetch_props():
     return []
  
  
-# ── SYSTEM STATUS (8 AM CST) ──────────────────────────────────────────────────
- 
 def run_system_status(dry_run, no_graphic):
     logger.info("MODE: system_status")
     state = get_and_update()
- 
     from engine.game_state_monitor import get_active_sports
     active = get_active_sports("EE")
     leagues = " · ".join(active) if active else "MLB · NBA · NHL"
- 
     text = (
         f"Edge Equation — {datetime.now().strftime('%A, %B %d')}\n\n"
         f"Engine active. No picks. No advice.\n\n"
@@ -92,54 +105,38 @@ def run_system_status(dry_run, no_graphic):
     _post_safe(text, "ee", "system_status", "EE", state, dry_run)
  
  
-# ── GOTD / POTD (10:30 AM CST) ───────────────────────────────────────────────
- 
 def run_gotd(dry_run, no_graphic):
     logger.info("MODE: gotd")
     state = get_and_update()
- 
     mlb_games = get_mlb_game_projections()
     top = find_top_game(mlb_games) if mlb_games else None
     if not top:
         logger.info("No GOTD — no qualifying games")
         return
- 
-    sport = "MLB"
-    text = generate_gotd(sport, top)
+    text = generate_gotd("MLB", top)
     if not text:
         logger.info("GOTD generation failed")
         return
- 
     _post_safe(text[:280], "ee", "EE_gotd", "EE", state, dry_run)
  
  
 def run_potd(dry_run, no_graphic):
     logger.info("MODE: potd")
     state = get_and_update()
- 
     props = _fetch_props()
     if not props:
         logger.info("No POTD — no qualifying props")
         return
- 
     top = find_top_prop(props)
     if not top:
         return
- 
-    sport_raw = top.get("sport", "MLB")
-sport_map = {
-    "baseball_mlb": "MLB",
-    "basketball_nba": "NBA",
-    "icehockey_nhl": "NHL",
-    "americanfootball_nfl": "NFL",
-    "basketball_wnba": "WNBA",
-}
-sport = sport_map.get(sport_raw, sport_raw.upper())
- 
+    sport = _normalize_sport(top.get("sport", "MLB"))
+    text = generate_potd(sport, top)
+    if not text:
+        logger.info("POTD generation failed")
+        return
     _post_safe(text[:280], "ee", "EE_potd", "EE", state, dry_run)
  
- 
-# ── ANNOUNCE ─────────────────────────────────────────────────────────────────
  
 def run_announce(dry_run, no_graphic):
     logger.info("MODE: announce")
@@ -148,33 +145,26 @@ def run_announce(dry_run, no_graphic):
     _post_safe(caption, "ee", "EE_projections", "EE", state, dry_run)
  
  
-# ── DAILY PROJECTIONS ─────────────────────────────────────────────────────────
- 
 def run_daily(dry_run, no_graphic):
     logger.info("MODE: daily")
     state = get_and_update()
- 
     mlb_games = get_mlb_game_projections()
     mlb_pitchers = get_mlb_pitcher_projections()
     nba_games = get_nba_game_projections()
     nhl_games = get_nhl_game_projections()
     nrfi_plays = calculate_nrfi_plays() or []
- 
     logger.info(f"MLB={len(mlb_games)} Pitchers={len(mlb_pitchers)} NBA={len(nba_games)} NHL={len(nhl_games)} NRFI={len(nrfi_plays)}")
- 
     props = _fetch_props()
     graded_props = grade_all_props(props) if props else []
     all_plays = graded_props + nrfi_plays
     if all_plays:
         all_plays = apply_kelly_to_plays(all_plays)
         save_plays(all_plays, "ee")
- 
     if all_plays:
         all_plays = track_clv_for_plays(all_plays)
     clv_plays = [p for p in all_plays if p.get("clv", 0) > 0.01]
     clv_post = generate_clv_post(clv_plays) if clv_plays else None
     analyses, why_passed = generate_all_analysis(all_plays)
- 
     try:
         from engine.parlay_engine import evaluate_game_for_parlay, get_todays_games
         game_bets = []
@@ -185,17 +175,14 @@ def run_daily(dry_run, no_graphic):
     except Exception as e:
         logger.error("Personal parlay failed: " + str(e))
         personal_parlay = None
- 
     personal_pp = build_personal_prizepicks(all_plays)
     bankroll = get_bankroll_summary()
     all_time = build_all_time_stats(style="ee")
- 
     from engine.content_generator import (
         generate_mlb_projection_post, generate_pitcher_projection_post,
         generate_nba_projection_post, generate_nhl_projection_post,
         generate_nrfi_probability_post,
     )
- 
     if not dry_run:
         if mlb_games:
             _post_safe(generate_mlb_projection_post(mlb_games), "ee", "EE_projections", "EE", state, dry_run)
@@ -209,7 +196,6 @@ def run_daily(dry_run, no_graphic):
             _post_safe(generate_nrfi_probability_post(nrfi_plays), "ee", "nrfi", "EE", state, dry_run)
         if clv_post:
             _post_safe(clv_post, "ee", "EE_projections", "EE", state, dry_run)
- 
         send_projections_only_email(
             mlb_games=mlb_games,
             mlb_pitchers=mlb_pitchers,
@@ -226,8 +212,6 @@ def run_daily(dry_run, no_graphic):
         logger.info(f"[DRY RUN] Would post {sum([bool(mlb_games), bool(mlb_pitchers), bool(nba_games), bool(nhl_games), bool(nrfi_plays)])} projection posts")
         logger.info(f"[DRY RUN] Personal plays: parlay={bool(personal_parlay)} pp={bool(personal_pp)}")
  
- 
-# ── RESULTS ───────────────────────────────────────────────────────────────────
  
 def run_results(dry_run, no_graphic):
     logger.info("MODE: results")
@@ -259,8 +243,6 @@ def run_results(dry_run, no_graphic):
         logger.error("Results failed: " + str(e))
  
  
-# ── WEEKLY ────────────────────────────────────────────────────────────────────
- 
 def run_weekly(dry_run, no_graphic):
     logger.info("MODE: weekly")
     state = get_and_update()
@@ -271,8 +253,6 @@ def run_weekly(dry_run, no_graphic):
     caption = caption_weekly(stats)
     _post_safe(caption, "ee", "EE_results", "EE", state, dry_run)
  
- 
-# ── PLAYOFFS ──────────────────────────────────────────────────────────────────
  
 def run_playoffs(dry_run, no_graphic):
     logger.info("MODE: playoffs")
@@ -289,8 +269,6 @@ def run_playoffs(dry_run, no_graphic):
     else:
         logger.info(f"[DRY RUN] Playoffs:\n{nba_post}\n{nhl_post}")
  
- 
-# ── CBC MODES ─────────────────────────────────────────────────────────────────
  
 def run_cbc_announce(dry_run, no_graphic):
     logger.info("MODE: cbc_announce")
@@ -341,8 +319,6 @@ def run_cbc_results(dry_run, no_graphic):
     _post_safe(results_text, "cbc", "CBC_results", "CBC", state, dry_run)
  
  
-# ── CBC GOTD / POTD ───────────────────────────────────────────────────────────
- 
 def run_cbc_gotd(dry_run, no_graphic):
     logger.info("MODE: cbc_gotd")
     state = get_and_update()
@@ -359,18 +335,12 @@ def run_cbc_gotd(dry_run, no_graphic):
 def run_cbc_potd(dry_run, no_graphic):
     logger.info("MODE: cbc_potd")
     state = get_and_update()
-    # CBC POTD uses KBO pitcher projections
     logger.info("CBC POTD — no prop source configured yet")
  
  
-# ── MANUAL SCANNER ────────────────────────────────────────────────────────────
- 
 def run_scan_game(dry_run, no_graphic):
     logger.info("MODE: scan_game")
-    from engine.manual_scanner import scan_game, format_scan_email, run_scan_and_email
-    import argparse
-    # These would be passed via CLI args in real use
-    # For now email a test scan
+    from engine.manual_scanner import scan_game, format_scan_email
     result = scan_game(
         sport="MLB",
         away="Yankees",
@@ -425,8 +395,6 @@ def run_scan_nrfi(dry_run, no_graphic):
         logger.info(f"[DRY RUN] Scan result:\n{body}")
  
  
-# ── REMINDERS ─────────────────────────────────────────────────────────────────
- 
 def run_weekly_reminder(dry_run, no_graphic):
     from engine.phase_reminder import run_phase_reminder
     run_phase_reminder("weekly")
@@ -452,10 +420,7 @@ def run_phase4(dry_run, no_graphic):
     run_phase_reminder("phase4")
  
  
-# ── MODE MAP ──────────────────────────────────────────────────────────────────
- 
 MODES = {
-    # EE daytime
     "system_status": run_system_status,
     "gotd": run_gotd,
     "potd": run_potd,
@@ -464,7 +429,6 @@ MODES = {
     "results": run_results,
     "weekly": run_weekly,
     "playoffs": run_playoffs,
-    # CBC overnight
     "cbc_announce": run_cbc_announce,
     "cbc_kbo": run_cbc_kbo,
     "cbc_npb": run_cbc_npb,
@@ -472,11 +436,9 @@ MODES = {
     "cbc_results": run_cbc_results,
     "cbc_gotd": run_cbc_gotd,
     "cbc_potd": run_cbc_potd,
-    # Manual scanners
     "scan_game": run_scan_game,
     "scan_prop": run_scan_prop,
     "scan_nrfi": run_scan_nrfi,
-    # Reminders
     "weekly_reminder": run_weekly_reminder,
     "monthly_reminder": run_monthly_reminder,
     "phase2": run_phase2,
