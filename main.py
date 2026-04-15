@@ -85,38 +85,6 @@ def game_has_started(play):
         return now >= start_dt
     except Exception:
         return False
-# ============================================================
-# EDGE EQUATION 3.0 — GLOBAL GAME START GUARDRAIL
-# ============================================================
-
-from datetime import timezone
-
-def game_has_started(play):
-    """
-    Returns True if the game has started or finished.
-    Works for all sports and all projection types.
-    """
-    status = (play.get("status") or "").lower()
-
-    # If API already marks it as live or final
-    if status in ("in_progress", "live", "final", "completed"):
-        return True
-
-    # Try to read start time
-    start = play.get("start_time") or play.get("game_time")
-    if not start:
-        return False
-
-    try:
-        if isinstance(start, str):
-            start_dt = datetime.fromisoformat(start.replace("Z", "+00:00"))
-        else:
-            start_dt = start
-
-        now = datetime.now(timezone.utc)
-        return now >= start_dt
-    except Exception:
-        return False
 
 
 
@@ -688,6 +656,319 @@ def run_phase3(dry_run, no_graphic):
 def run_phase4(dry_run, no_graphic):
     from engine.phase_reminder import run_phase_reminder
     run_phase_reminder("phase4")
+    # ============================================================
+# EDGE EQUATION 3.0 — SIGNAL SELECTION LAYER
+# ============================================================
+
+def _load_all_today_plays():
+    """
+    Helper to load all today's plays (props + NRFI) using existing pipeline.
+    Reuses _fetch_props + grade_all_props + calculate_nrfi_plays.
+    """
+    props = _fetch_props()
+    graded_props = grade_all_props(props) if props else []
+    nrfi_plays = calculate_nrfi_plays() or []
+    all_plays = graded_props + nrfi_plays
+    return all_plays
+
+
+def _sort_by_edge(plays):
+    return sorted(plays, key=lambda x: -x.get("edge", 0))
+
+
+def _filter_props(plays):
+    return [p for p in plays if p.get("prop_label") in ("K", "SOG", "3PM", "PTS", "AST", "REB")]
+
+
+def _filter_nrfi(plays):
+    return [p for p in plays if p.get("prop_label") in ("NRFI", "YRFI")]
+
+
+def _filter_games(plays):
+    return [
+        p for p in plays
+        if p.get("prop_label") not in ("K", "NRFI", "YRFI", "3PM", "PTS", "SOG", "AST", "REB")
+    ]
+    # ============================================================
+# EDGE EQUATION 3.0 — PUBLIC SIGNAL MODES
+# ============================================================
+
+def run_model_notes(dry_run, no_graphic):
+    """
+    Daily Model Notes — anchor post.
+    For now, this is a simple placeholder using existing stats.
+    Later we’ll wire this to a dedicated engine_tuning module.
+    """
+    logger.info("MODE: model_notes")
+
+    # Simple version: pull weekly stats + all-time as context
+    weekly = build_weekly_stats(style="ee")
+    all_time = build_all_time_stats(style="ee")
+
+    lines = [
+        "EDGE EQUATION 3.0 — MODEL NOTES",
+        "",
+        f"Weekly volume: {weekly.get('total', 0)} graded outputs",
+        f"All-time volume: {all_time.get('total', 0)} graded outputs",
+        "",
+        "Model continues to scan:",
+        "• Scoring environments",
+        "• Pace and shot volume",
+        "• Volatility and late-game drift",
+        "",
+        "Always learning. Always refining.",
+        "#EdgeEquation",
+    ]
+    caption = "\n".join(lines)
+
+    if not dry_run:
+        post_tweet(caption)
+        logger.info("Model notes posted")
+    else:
+        logger.info("[DRY RUN] Model notes:\n" + caption)
+
+
+def run_primary_signal(dry_run, no_graphic):
+    """
+    Primary Signal — top game-level edge.
+    Reuses GOTD logic but with 3.0 naming and cleaner framing.
+    """
+    logger.info("MODE: primary_signal")
+    try:
+        all_plays = _load_all_today_plays()
+        if not all_plays:
+            logger.info("No plays available for Primary Signal")
+            return
+
+        all_plays = _sort_by_edge(all_plays)
+        game_plays = _filter_games(all_plays)
+        top_game = game_plays[0] if game_plays else None
+
+        if not top_game:
+            logger.info("No game-level edges for Primary Signal")
+            return
+
+        text = generate_gotd_from_play(top_game)
+        if not text:
+            logger.warning("Primary Signal generation returned empty")
+            return
+
+        # 3.0 framing: analytics, not picks
+        header = "EDGE EQUATION 3.0 — PRIMARY SIGNAL"
+        caption = header + "\n\n" + text
+
+        if not dry_run:
+            post_tweet(caption)
+            logger.info("Primary Signal posted")
+        else:
+            logger.info("[DRY RUN] Primary Signal:\n" + caption)
+    except Exception as e:
+        logger.error("Primary Signal failed: " + str(e))
+
+
+def run_prop_efficiency_signal(dry_run, no_graphic):
+    """
+    Prop Efficiency Signal — top prop edge.
+    """
+    logger.info("MODE: prop_efficiency_signal")
+    try:
+        all_plays = _load_all_today_plays()
+        if not all_plays:
+            logger.info("No plays available for Prop Efficiency Signal")
+            return
+
+        all_plays = _sort_by_edge(all_plays)
+        prop_plays = _filter_props(all_plays)
+        top_prop = prop_plays[0] if prop_plays else None
+
+        if not top_prop:
+            logger.info("No prop edges for Prop Efficiency Signal")
+            return
+
+        text = generate_potd_from_play(top_prop)
+        if not text:
+            logger.warning("Prop Efficiency Signal generation returned empty")
+            return
+
+        header = "EDGE EQUATION 3.0 — PROP EFFICIENCY SIGNAL"
+        caption = header + "\n\n" + text
+
+        if not dry_run:
+            post_tweet(caption)
+            logger.info("Prop Efficiency Signal posted")
+        else:
+            logger.info("[DRY RUN] Prop Efficiency Signal:\n" + caption)
+    except Exception as e:
+        logger.error("Prop Efficiency Signal failed: " + str(e))
+
+
+def run_run_suppression_signal(dry_run, no_graphic):
+    """
+    Run Suppression Signal — top NRFI/YRFI edge.
+    """
+    logger.info("MODE: run_suppression_signal")
+    try:
+        all_plays = _load_all_today_plays()
+        if not all_plays:
+            logger.info("No plays available for Run Suppression Signal")
+            return
+
+        all_plays = _sort_by_edge(all_plays)
+        nrfi_plays = _filter_nrfi(all_plays)
+        top_nrfi = nrfi_plays[0] if nrfi_plays else None
+
+        if not top_nrfi:
+            logger.info("No NRFI/YRFI edges for Run Suppression Signal")
+            return
+
+        text = generate_first_inning_from_play(top_nrfi)
+        if not text:
+            logger.warning("Run Suppression Signal generation returned empty")
+            return
+
+        header = "EDGE EQUATION 3.0 — RUN SUPPRESSION SIGNAL"
+        caption = header + "\n\n" + text
+
+        if not dry_run:
+            post_tweet(caption)
+            logger.info("Run Suppression Signal posted")
+        else:
+            logger.info("[DRY RUN] Run Suppression Signal:\n" + caption)
+    except Exception as e:
+        logger.error("Run Suppression Signal failed: " + str(e))
+
+
+def run_high_confidence_outlier(dry_run, no_graphic):
+    """
+    High-Confidence Outlier — single highest edge across all plays.
+    """
+    logger.info("MODE: high_confidence_outlier")
+    try:
+        all_plays = _load_all_today_plays()
+        if not all_plays:
+            logger.info("No plays available for High-Confidence Outlier")
+            return
+
+        all_plays = _sort_by_edge(all_plays)
+        top_play = all_plays[0]
+
+        # Reuse GOTD/POTD generator depending on type
+        if top_play.get("prop_label") in ("K", "SOG", "3PM", "PTS", "AST", "REB"):
+            text = generate_potd_from_play(top_play)
+        else:
+            text = generate_gotd_from_play(top_play)
+
+        if not text:
+            logger.warning("High-Confidence Outlier generation returned empty")
+            return
+
+        header = "EDGE EQUATION 3.0 — HIGH-CONFIDENCE OUTLIER"
+        caption = header + "\n\n" + text
+
+        if not dry_run:
+            post_tweet(caption)
+            logger.info("High-Confidence Outlier posted")
+        else:
+            logger.info("[DRY RUN] High-Confidence Outlier:\n" + caption)
+    except Exception as e:
+        logger.error("High-Confidence Outlier failed: " + str(e))
+
+
+def run_secondary_alignment(dry_run, no_graphic):
+    """
+    Secondary Alignment — second-strongest edge.
+    """
+    logger.info("MODE: secondary_alignment")
+    try:
+        all_plays = _load_all_today_plays()
+        if not all_plays or len(all_plays) < 2:
+            logger.info("Not enough plays for Secondary Alignment")
+            return
+
+        all_plays = _sort_by_edge(all_plays)
+        second_play = all_plays[1]
+
+        if second_play.get("prop_label") in ("K", "SOG", "3PM", "PTS", "AST", "REB"):
+            text = generate_potd_from_play(second_play)
+        else:
+            text = generate_gotd_from_play(second_play)
+
+        if not text:
+            logger.warning("Secondary Alignment generation returned empty")
+            return
+
+        header = "EDGE EQUATION 3.0 — SECONDARY ALIGNMENT"
+        caption = header + "\n\n" + text
+
+        if not dry_run:
+            post_tweet(caption)
+            logger.info("Secondary Alignment posted")
+        else:
+            logger.info("[DRY RUN] Secondary Alignment:\n" + caption)
+    except Exception as e:
+        logger.error("Secondary Alignment failed: " + str(e))
+        # ============================================================
+# EDGE EQUATION 3.0 — DAILY EMAIL MODE
+# ============================================================
+
+def run_daily_email(dry_run, no_graphic):
+    """
+    3.0 daily email:
+    - Reuses existing projections + parlay + PrizePicks logic from run_daily
+    - Does NOT post to X
+    - Sends projections-only email (including parlay + PP)
+    """
+    logger.info("MODE: daily_email")
+
+    logger.info("Fetching projections for email...")
+    mlb_games = get_mlb_game_projections()
+    mlb_pitchers = get_mlb_pitcher_projections()
+    nba_games = get_nba_game_projections()
+    nhl_games = get_nhl_game_projections()
+    nrfi_plays = calculate_nrfi_plays() or []
+
+    kbo_games = get_kbo_projections()
+    npb_games = get_npb_projections()
+    epl_games = get_epl_projections()
+    ucl_games = get_ucl_projections()
+
+    props = _fetch_props()
+    graded_props = grade_all_props(props) if props else []
+    all_plays = graded_props + nrfi_plays
+
+    if all_plays:
+        all_plays = apply_kelly_to_plays(all_plays)
+        save_plays(all_plays, "ee")
+        all_plays = track_clv_for_plays(all_plays)
+
+    try:
+        from engine.parlay_engine import evaluate_game_for_parlay, get_todays_games
+        game_bets = []
+        for game in get_todays_games():
+            game_bets.extend(evaluate_game_for_parlay(game))
+        personal_parlay = build_personal_parlay(game_bets)
+    except Exception as e:
+        logger.error("Personal parlay failed (email mode): " + str(e))
+        personal_parlay = None
+
+    personal_pp = build_personal_prizepicks(all_plays)
+    bankroll = get_bankroll_summary()
+    all_time = build_all_time_stats(style="ee")
+
+    if not dry_run:
+        send_projections_only_email(
+            mlb_games=mlb_games, mlb_pitchers=mlb_pitchers,
+            nba_games=nba_games, nhl_games=nhl_games,
+            nrfi_plays=nrfi_plays,
+            personal_parlay=personal_parlay, personal_pp=personal_pp,
+            bankroll_summary=bankroll, all_time_stats=all_time,
+        )
+        logger.info("3.0 daily email sent")
+    else:
+        logger.info("[DRY RUN] 3.0 daily email would be sent")
+
+
+
 
 
 MODES = {
@@ -715,6 +996,14 @@ MODES = {
     "phase2": run_phase2,
     "phase3": run_phase3,
     "phase4": run_phase4,
+        "model_notes": run_model_notes,
+    "primary_signal": run_primary_signal,
+    "prop_efficiency_signal": run_prop_efficiency_signal,
+    "run_suppression_signal": run_run_suppression_signal,
+    "high_confidence_outlier": run_high_confidence_outlier,
+    "secondary_alignment": run_secondary_alignment,
+    "daily_email": run_daily_email,
+
 }
 
 
