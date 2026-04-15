@@ -598,6 +598,7 @@ MODES = {
     "playoffs": run_playoffs,
     "cbc_announce": run_cbc_announce,
     "cbc_kbo": run_cbc_kbo,
+    "first_inning_potd": run_first_inning_potd,
     "cbc_npb": run_cbc_npb,
     "cbc_epl": run_cbc_epl,
     "cbc_results": run_cbc_results,
