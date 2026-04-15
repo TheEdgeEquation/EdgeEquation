@@ -863,6 +863,7 @@ def run_high_confidence_outlier(dry_run, no_graphic):
             return
 
         header = "EDGE EQUATION 3.0 — HIGH-CONFIDENCE OUTLIER"
+                header = "EDGE EQUATION 3.0 — HIGH-CONFIDENCE OUTLIER"
         caption = header + "\n\n" + text
 
         if not dry_run:
@@ -1026,5 +1027,6 @@ def main():
 if __name__ == "__main__":
     main()
 
+    
 
 
