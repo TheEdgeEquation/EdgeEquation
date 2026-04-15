@@ -1,4 +1,3 @@
-from typing import List, Dict
 from engine.bracket_core import TeamRecord, assign_seeds_by_conference, build_standard_1_to_8_bracket
 
 
