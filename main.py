@@ -97,6 +97,32 @@ def run_system_status(dry_run, no_graphic):
     else:
         logger.info("[DRY RUN] System status:\n" + caption)
 
+def run_first_inning_potd(dry_run, no_graphic):
+    logger.info("MODE: first_inning_potd")
+    try:
+        nrfi_plays = calculate_nrfi_plays() or []
+
+        if not nrfi_plays:
+            logger.info("No NRFI/YRFI plays available for First Inning POTD")
+            return
+
+        # Sort by edge descending
+        nrfi_plays.sort(key=lambda x: -x.get("edge", 0))
+        top_nrfi = nrfi_plays[0]
+
+        fi_text = generate_first_inning_from_play(top_nrfi)
+        if not fi_text:
+            logger.warning("First Inning POTD generation returned empty")
+            return
+
+        if not dry_run:
+            post_tweet(fi_text)
+            logger.info("First Inning Play of the Day posted")
+        else:
+            logger.info("[DRY RUN] First Inning POTD:\n" + fi_text)
+
+    except Exception as e:
+        logger.error("First Inning POTD failed: " + str(e))
 
 def run_gotd(dry_run, no_graphic):
     logger.info("MODE: gotd")
