@@ -923,7 +923,11 @@ def validate_modes():
             p = params[r]
             if p.kind not in (p.KEYWORD_ONLY, p.POSITIONAL_OR_KEYWORD):
                 raise TypeError(
-                    f"Mode '{mode_name}' parameter '{r}' must be keyword compayible")
+                    f"Mode '{mode_name}' parameter '{r}' must be keyword-compatible"
+                )
+                validate_modes()
+
+
 
 
 # ============================================================
