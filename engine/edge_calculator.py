@@ -223,6 +223,16 @@ def calculate_edge(prop):
         "over_edge": over_edge,
         "under_edge": under_edge,
     }
+if true_lambda is None:
+    if sport.startswith("baseball_") and prop_label in (
+        "HITS", "TOTAL_BASES", "HOME_RUNS", "RBI", "RUNS"
+    ):
+        true_lambda = calculate_true_lambda_batter(prop)
+    elif sport == "baseball_mlb":
+        true_lambda = calculate_true_lambda_mlb(prop)
+    else:
+        true_lambda = max(line, 0.1)
+
 
  
  
