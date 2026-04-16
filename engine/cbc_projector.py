@@ -82,46 +82,63 @@ def get_ucl_projections():
 
 
  
- 
-def get_ucl_projections():
+ def get_ucl_projections():
     try:
         if not FOOTBALL_DATA_KEY:
             return []
+
         today = datetime.now().strftime("%Y-%m-%d")
         tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+
         url = FOOTBALL_DATA_API + "/competitions/" + UCL_ID + "/matches"
         headers = {"X-Auth-Token": FOOTBALL_DATA_KEY}
         params = {"dateFrom": today, "dateTo": tomorrow, "status": "SCHEDULED"}
+
         resp = requests.get(url, headers=headers, params=params, timeout=15)
         if resp.status_code in (403, 429):
             return []
+
         resp.raise_for_status()
         data = resp.json()
+
         projections = []
         for match in data.get("matches", []):
             home = match.get("homeTeam", {}).get("shortName", "") or match.get("homeTeam", {}).get("name", "")
             away = match.get("awayTeam", {}).get("shortName", "") or match.get("awayTeam", {}).get("name", "")
             commence = match.get("utcDate", "")
+
             home_goals, away_goals = _project_soccer_score(home, away)
+
             projections.append({
-                "home_team": home, "away_team": away,
-                "home_goals": home_goals, "away_goals": away_goals,
+                "home_team": home,
+                "away_team": away,
+                "home_goals": home_goals,
+                "away_goals": away_goals,
                 "total": round(home_goals + away_goals, 1),
-                "league": "Champions League", "commence_time": commence,
+                "league": "Champions League",
+                "commence_time": commence,
             })
+
         logger.info("UCL projections: " + str(len(projections)) + " matches")
 
-from engine.global_clv_helper import attach_clv_to_list
-projections = attach_clv_to_list(projections)
+        # --- GLOBAL CLV ---
+        from engine.global_clv_helper import attach_clv_to_list
+        projections = attach_clv_to_list(projections)
 
-from engine.global_validator import validate_global_list
-projections = validate_global_list(projections)
+        # --- GLOBAL VALIDATION ---
+        from engine.global_validator import validate_global_list
+        projections = validate_global_list(projections)
 
-from engine.global_schema_enforcer import enforce_schema_list
-projections = enforce_schema_list(projections)
+        # --- GLOBAL SCHEMA ENFORCER ---
+        from engine.global_schema_enforcer import enforce_schema_list
+        projections = enforce_schema_list(projections)
 
-return projections
+        return projections
 
+    except Exception as e:
+        logger.error("UCL projections failed: " + str(e))
+        return []
+ 
 
  
  
