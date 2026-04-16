@@ -93,6 +93,10 @@ def get_ucl_projections():
     ...
     from engine.global_clv_helper import attach_clv_to_list
     return attach_clv_to_list(games)
+ from engine.global_validator import validate_global_list
+games = validate_global_list(games)
+
+return games
 
  
  
