@@ -450,7 +450,7 @@ def run_monthly(dry_run, no_graphic):
     else:
         logger.info("[DRY RUN] Monthly:\n" + caption)
 
-    ]
+    
     # ============================================================
 # EDGE EQUATION 3.0 — US SIGNAL MODES
 # ============================================================
