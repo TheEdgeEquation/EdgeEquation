@@ -871,7 +871,7 @@ MODES = {
     "global_run_suppression_signal": run_global_run_suppression_signal,
     "global_high_confidence_outlier": run_global_high_confidence_outlier,
     "global_secondary_alignment": run_global_secondary_alignment,
-    "global_model_notes": run_global_model_notes,
+
 
 
     # Daily email
