@@ -255,7 +255,8 @@ def run_potd(dry_run, no_graphic):
 
         all_plays.sort(key=lambda x: -x.get("edge", 0))
 
-        prop_plays = _filter_props(plays)
+        # Filter props for POTD
+prop_plays = _filter_props(plays)
 
 cleaned = []
 for play in prop_plays:
@@ -263,6 +264,9 @@ for play in prop_plays:
     if play.get("prop_label") in ("NRFI", "YRFI"):
         continue
     cleaned.append(play)
+
+top_prop = cleaned[0] if cleaned else None
+
 
 
 
