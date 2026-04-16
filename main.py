@@ -856,10 +856,7 @@ def run_daily_email(dry_run, no_graphic):
 # MODES DICTIONARY — 3.0 ALIGNED
 # ============================================================
 
-
-
-
-    MODES_US_3 = {
+MODES_US_3 = {
     "model_notes": run_model_notes,
     "primary_signal": run_primary_signal,
     "prop_efficiency_signal": run_prop_efficiency_signal,
@@ -867,6 +864,7 @@ def run_daily_email(dry_run, no_graphic):
     "high_confidence_outlier": run_high_confidence_outlier,
     "secondary_alignment": run_secondary_alignment,
 }
+
 MODES_GLOBAL_3 = {
     "global_primary_signal": run_global_primary_signal,
     "global_prop_efficiency_signal": run_global_prop_efficiency_signal,
@@ -874,6 +872,7 @@ MODES_GLOBAL_3 = {
     "global_high_confidence_outlier": run_global_high_confidence_outlier,
     "global_secondary_alignment": run_global_secondary_alignment,
 }
+
 MODES_LEGACY = {
     "daily_email": run_daily_email,
     "system_status": run_system_status,
@@ -893,15 +892,21 @@ MODES_LEGACY = {
     "phase3": run_phase3,
     "phase4": run_phase4,
 }
+
+# Final merged router
+MODES = {
+    **MODES_US_3,
+    **MODES_GLOBAL_3,
+    **MODES_LEGACY,
+}
+
+# ============================================================
+# MODE SIGNATURE VALIDATION
+# ============================================================
+
 import inspect
 
 def validate_modes():
-    """
-    Ensures every mode in MODES:
-    - is callable
-    - accepts dry_run and no_graphic keyword arguments
-    - has no missing or extra required parameters
-    """
     for mode_name, fn in MODES.items():
         if not callable(fn):
             raise TypeError(f"Mode '{mode_name}' is not callable")
@@ -909,7 +914,6 @@ def validate_modes():
         sig = inspect.signature(fn)
         params = sig.parameters
 
-        # Required parameters
         required = ["dry_run", "no_graphic"]
 
         for r in required:
@@ -918,7 +922,6 @@ def validate_modes():
                     f"Mode '{mode_name}' must accept '{r}' as a parameter"
                 )
 
-        # Ensure they are keyword-compatible
         for r in required:
             p = params[r]
             if p.kind not in (p.KEYWORD_ONLY, p.POSITIONAL_OR_KEYWORD):
@@ -926,8 +929,8 @@ def validate_modes():
                     f"Mode '{mode_name}' parameter '{r}' must be keyword-compatible"
                 )
 
-# Run validator immediately after defining MODES
 validate_modes()
+
 
 
 
