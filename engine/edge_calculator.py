@@ -119,6 +119,46 @@ def calculate_true_lambda_mlb(prop):
     except Exception as e:
         logger.error("True lambda batter failed: " + str(e))
         return max(prop.get("true_lambda", prop.get("line", 1.0)), 0.05)
+     def calculate_true_lambda_batter(prop):
+    """
+    Generic batter lambda for counting stats:
+    HITS, TOTAL_BASES, HOME_RUNS, RBI, RUNS.
+    """
+    try:
+        from engine.stats.mlb_batter import get_full_batter_profile
+        from engine.stats.weather import get_weather
+        from engine.stats.park_factors import get_batter_park_adjustment
+        from engine.stats.pitcher_matchup import get_pitcher_matchup_adjustment
+
+        player = prop.get("player", "")
+        team = prop.get("team", "")
+        opponent = prop.get("opponent", "")
+        prop_label = prop.get("prop_label", "HITS")
+
+        profile = get_full_batter_profile(player, team, opponent)
+
+        # Base per-game expectation by prop type
+        base_map = {
+            "HITS": profile.get("hits_per_game", 1.0),
+            "TOTAL_BASES": profile.get("tb_per_game", 2.0),
+            "HOME_RUNS": profile.get("hr_per_game", 0.25),
+            "RBI": profile.get("rbi_per_game", 0.8),
+            "RUNS": profile.get("runs_per_game", 0.8),
+        }
+        base = base_map.get(prop_label, profile.get("stat_per_game", 1.0))
+
+        pitcher_adj = get_pitcher_matchup_adjustment(profile)
+        park_adj = get_batter_park_adjustment(team)
+        weather = get_weather(team)
+        weather_adj = weather.get("run_env_adjustment", 1.0)
+
+        true_lambda = base * pitcher_adj * park_adj * weather_adj
+        return round(max(true_lambda, 0.05), 3)
+
+    except Exception as e:
+        logger.error("True lambda batter failed: " + str(e))
+        return max(prop.get("true_lambda", prop.get("line", 1.0)), 0.05)
+
 
  
  
