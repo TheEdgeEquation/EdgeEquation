@@ -146,7 +146,8 @@ def run_daily_email(dry_run, no_graphic):
         bankroll = get_bankroll_summary()
 
         if not dry_run:
-            from engine.emailer import send_projections_only_email
+            from email_sender import send_projections_only_email
+
 
             send_projections_only_email(
                 mlb_games=mlb_games,
