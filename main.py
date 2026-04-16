@@ -131,9 +131,10 @@ def _filter_games(plays):
     return [
         p for p in plays
         if p.get("prop_label") not in ("K", "NRFI", "YRFI", "3PM", "PTS", "SOG", "AST", "REB")
-        # ============================================================
-# LEGACY MODES (CLEAN + STABLE)
-# ============================================================
+    ]
+    # ============================================================
+    # LEGACY MODES (CLEAN + STABLE)
+    # ============================================================
 
 def run_system_status(dry_run, no_graphic):
     logger.info("MODE: system_status")
