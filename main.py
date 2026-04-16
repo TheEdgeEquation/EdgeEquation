@@ -256,7 +256,7 @@ def run_potd(dry_run, no_graphic):
         all_plays.sort(key=lambda x: -x.get("edge", 0))
 
         # Filter props for POTD
-prop_plays = _filter_props(plays)
+prop_plays = _filter_props(all_plays)
 
 cleaned = []
 for play in prop_plays:
