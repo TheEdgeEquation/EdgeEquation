@@ -925,8 +925,9 @@ def validate_modes():
                 raise TypeError(
                     f"Mode '{mode_name}' parameter '{r}' must be keyword-compatible"
                 )
-                validate_modes()
 
+# Run validator immediately after defining MODES
+validate_modes()
 
 
 
