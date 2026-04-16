@@ -43,7 +43,8 @@ PINNACLE_TEAM_MAP: Dict[str, str] = {
 
 # Replace these with real URLs/endpoints
 KBO_OFFICIAL_URL_TEMPLATE = "https://example.kbo.or.kr/schedule?date={date}"
-NPB_OFFICIAL_URL_TEMPLATE = "https://example.yahoo.jp/npb/schedule?date={date}"
+NPB_OFFICIAL_URL_TEMPLATE = "https://npb.jp/bis/eng/{year}/games/gm{yyyymmdd}.html"
+
 
 PINNACLE_API_URL_TEMPLATE = (
     "https://example.pinnacle.com/api/baseball/{league}/odds?date={date}"
@@ -174,26 +175,51 @@ def fetch_kbo_official_schedule(
     _debug_print(debug, f"[KBO OFFICIAL] Parsed games: {len(games)}")
     return games
 
+def _build_npb_url(target_date: dt.date) -> str:
+    year = target_date.year
+    yyyymmdd = target_date.strftime("%Y%m%d")
+    return NPB_OFFICIAL_URL_TEMPLATE.format(year=year, yyyymmdd=yyyymmdd)
 
 def fetch_npb_official_schedule(
     target_date: dt.date,
     debug: bool = False,
 ) -> List[GameSchedule]:
     """
-    Scrape official NPB schedule (e.g., Yahoo Japan JSON) for target_date.
-
-    TODO:
-      - Replace URL with real NPB/Yahoo JSON endpoint
-      - Parse JSON and build GameSchedule objects
+    Scrape official NPB schedule from:
+    https://npb.jp/bis/eng/{year}/games/gm{yyyymmdd}.html
     """
-    url = NPB_OFFICIAL_URL_TEMPLATE.format(date=target_date.strftime("%Y%m%d"))
+    url = _build_npb_url(target_date)
     _debug_print(debug, f"[NPB OFFICIAL] GET {url}")
+
     try:
         resp = requests.get(url, headers=HEADERS, timeout=10)
         resp.raise_for_status()
     except Exception as e:
         _debug_print(debug, f"[NPB OFFICIAL] Error: {e}")
         return []
+
+    html = resp.text
+
+    # TODO:
+    #   - Use BeautifulSoup to parse `html`
+    #   - For each matchup, extract:
+    #       * away team name
+    #       * home team name
+    #       * start time (e.g., "18:00")
+    #   - Build GameSchedule objects with:
+    #       league="npb"
+    #       date=target_date
+    #       home_team=...
+    #       away_team=...
+    #       start_time=... (as datetime if you want)
+    #       status="scheduled"
+    #
+    # For now, we return an empty list so the engine runs without crashing.
+    games: List[GameSchedule] = []
+
+    _debug_print(debug, f"[NPB OFFICIAL] Parsed games: {len(games)}")
+    return games
+
 
     # TODO: parse JSON
     # Example:
