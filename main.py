@@ -89,7 +89,11 @@ def _fetch_props():
     """
     Fetch props with retry logic.
     """
-    from engine.prop_generator import generate_all_props
+    from engine.prizepicks_scraper import fetch_prizepicks_props
+def _fetch_props():
+    logger.info("Fetching props (PrizePicks validated)...")
+    return fetch_prizepicks_props()
+
     for attempt in range(1, 5):
         logger.info(f"Fetch attempt {attempt} of 4")
         try:
