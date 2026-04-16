@@ -5,7 +5,6 @@ logger = logging.getLogger(__name__)
 # Baseball
 from engine.baseball_router import get_baseball_projections
 
-# Basketball (placeholder imports — you plug in your real scrapers)
 
 # Football (NFL)
 from engine.nfl_scraper import get_nfl_projections
