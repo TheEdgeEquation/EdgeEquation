@@ -1,98 +1,43 @@
 import argparse
 import logging
-import sys
-import time
-from datetime import datetime, timezone
-import inspect
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)]
-)
-logger = logging.getLogger("main")
-
-# ============================================================
-# ENGINE IMPORTS
-# ============================================================
+from datetime import datetime
 
 from engine.edge_calculator import grade_all_props, calculate_nrfi_plays
-from engine.data_tracker import save_plays, build_weekly_stats, build_all_time_stats, save_results
-from engine.score_checker import check_all_results
-from engine.email_sender import send_projections_only_email, send_results_email
-from engine.parlay_engine import build_game_parlay, build_prizepicks_parlay
-from engine.personal_engine import build_personal_parlay, build_personal_prizepicks
-from engine.kelly_calculator import apply_kelly_to_plays, get_bankroll_summary
-from engine.content_generator import (
-    generate_mlb_projection_post, generate_pitcher_projection_post,
-    generate_nba_projection_post, generate_nhl_projection_post,
-    generate_nrfi_probability_post, generate_results_post,
-    generate_kbo_projection_post, generate_npb_projection_post,
-    generate_epl_projection_post, generate_ucl_projection_post,
-    get_daily_cta,
+from engine.prizepicks_scraper import fetch_prizepicks_props
+from engine.results_checker import (
+    check_mlb_results,
+    check_pitcher_results,
+    check_global_results,
 )
-from engine.closing_line_tracker import track_clv_for_plays, generate_clv_post
-from engine.game_projector import (
-    get_mlb_game_projections, get_nba_game_projections,
-    get_nhl_game_projections, get_mlb_pitcher_projections,
-)
-from engine.kbo_scraper import get_kbo_projections
-from engine.npb_scraper import get_npb_projections
-from engine.cbc_projector import get_epl_projections, get_ucl_projections
-from engine.gotd_generator import (
+from engine.content_generators import (
     generate_gotd_from_play,
     generate_potd_from_play,
-    generate_first_inning_from_play
+    generate_first_inning_from_play,
+    generate_results_post,
+    generate_called_it_post,
+    generate_daily_accuracy_post,
+    caption_weekly,
 )
-from post_to_x import post_tweet, caption_weekly
-from engine.highlight_generator import (
-    check_mlb_results, check_pitcher_results,
-    generate_called_it_post, generate_daily_accuracy_post,
+from engine.global_accuracy import (
+    evaluate_global_results,
+    generate_global_accuracy_post,
 )
+from engine.social import post_tweet
+from engine.stats_tracker import (
+    build_weekly_stats,
+    build_all_time_stats,
+)
+from engine.utils import game_has_started, get_daily_cta
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
+
 
 # ============================================================
-# EDGE EQUATION 3.0 — GLOBAL GAME START GUARDRAIL
+# INGESTION + FILTERS
 # ============================================================
-
-def game_has_started(play):
-    """
-    Returns True if the game has started or finished.
-    Works for all sports and all projection types.
-    """
-    status = (play.get("status") or "").lower()
-
-    if status in ("in_progress", "live", "final", "completed"):
-        return True
-
-    start = play.get("start_time") or play.get("game_time")
-    if not start:
-        return False
-
-    try:
-        if isinstance(start, str):
-            start_dt = datetime.fromisoformat(start.replace("Z", "+00:00"))
-        else:
-            start_dt = start
-
-        now = datetime.now(timezone.utc)
-        return now >= start_dt
-    except Exception:
-        return False
-
-# ============================================================
-# HELPERS
-# ============================================================
-
-def _today():
-    return datetime.now().strftime("%Y%m%d")
 
 def _fetch_props():
-    """
-    3.0 — PrizePicks-only, validated prop ingestion.
-    Removes retry logic and old generators.
-    """
-    from engine.prizepicks_scraper import fetch_prizepicks_props
-
     logger.info("Fetching props (PrizePicks validated)...")
     props = fetch_prizepicks_props() or []
 
@@ -102,9 +47,6 @@ def _fetch_props():
 
     return props
 
-# ============================================================
-# EDGE EQUATION 3.0 — SIGNAL SELECTION LAYER
-# ============================================================
 
 def _load_all_today_plays():
     """
@@ -115,8 +57,10 @@ def _load_all_today_plays():
     nrfi_plays = calculate_nrfi_plays() or []
     return graded_props + nrfi_plays
 
+
 def _sort_by_edge(plays):
     return sorted(plays, key=lambda x: -x.get("edge", 0))
+
 
 def _filter_props(plays):
     return [
@@ -124,17 +68,23 @@ def _filter_props(plays):
         if p.get("prop_label") not in ("NRFI", "YRFI")
     ]
 
+
 def _filter_nrfi(plays):
     return [p for p in plays if p.get("prop_label") in ("NRFI", "YRFI")]
+
 
 def _filter_games(plays):
     return [
         p for p in plays
-        if p.get("prop_label") not in ("K", "NRFI", "YRFI", "3PM", "PTS", "SOG", "AST", "REB")
+        if p.get("prop_label") not in (
+            "K", "NRFI", "YRFI", "3PM", "PTS", "SOG", "AST", "REB"
+        )
     ]
-    # ============================================================
-    # LEGACY MODES (CLEAN + STABLE)
-    # ============================================================
+
+
+# ============================================================
+# LEGACY MODES (CLEAN + STABLE)
+# ============================================================
 
 def run_system_status(dry_run, no_graphic):
     logger.info("MODE: system_status")
@@ -160,6 +110,64 @@ def run_system_status(dry_run, no_graphic):
         logger.info("[DRY RUN] System status:\n" + caption)
 
 
+def run_daily_email(dry_run, no_graphic):
+    logger.info("MODE: daily_email")
+
+    try:
+        # Core projections
+        from engine.projectors.mlb_games import get_mlb_game_projections
+        from engine.projectors.mlb_pitchers import get_mlb_pitcher_projections
+        from engine.projectors.nba_games import get_nba_game_projections
+        from engine.projectors.nhl_games import get_nhl_game_projections
+
+        # NRFI/YRFI engine
+        nrfi_plays = calculate_nrfi_plays() or []
+
+        # Personalization engines
+        from engine.personal_engine import (
+            build_personal_parlay,
+            build_personal_prizepicks_card,
+        )
+
+        # Bankroll + all-time stats
+        from engine.data_tracker import get_bankroll_summary
+        all_time = build_all_time_stats(style="ee")
+
+        # Build projections
+        mlb_games = get_mlb_game_projections()
+        mlb_pitchers = get_mlb_pitcher_projections()
+        nba_games = get_nba_game_projections()
+        nhl_games = get_nhl_game_projections()
+
+        # Personal cards
+        personal_parlay = build_personal_parlay()
+        personal_pp = build_personal_prizepicks_card()
+
+        bankroll = get_bankroll_summary()
+
+        if not dry_run:
+            from engine.emailer import send_projections_only_email
+
+            send_projections_only_email(
+                mlb_games=mlb_games,
+                mlb_pitchers=mlb_pitchers,
+                nba_games=nba_games,
+                nhl_games=nhl_games,
+                nrfi_plays=nrfi_plays,
+                personal_parlay=personal_parlay,
+                personal_pp=personal_pp,
+                bankroll_summary=bankroll,
+                all_time_stats=all_time,
+            )
+
+            logger.info("Daily email sent")
+        else:
+            logger.info("[DRY RUN] Daily email generated")
+
+    except Exception as e:
+        logger.error("Daily email failed: " + str(e))
+
+
 def run_first_inning_potd(dry_run, no_graphic):
     logger.info("MODE: first_inning_potd")
     try:
@@ -178,14 +186,65 @@ def run_first_inning_potd(dry_run, no_graphic):
             logger.warning("First Inning POTD generation returned empty")
             return
 
+        caption = "EDGE EQUATION — FIRST INNING POTD\n\n" + fi_text
+
         if not dry_run:
-            post_tweet(fi_text)
+            post_tweet(caption)
             logger.info("First Inning POTD posted")
         else:
-            logger.info("[DRY RUN] First Inning POTD:\n" + fi_text)
+            logger.info("[DRY RUN] First Inning POTD:\n" + caption)
 
     except Exception as e:
         logger.error("First Inning POTD failed: " + str(e))
+
+
+def run_daily(dry_run, no_graphic):
+    logger.info("MODE: daily")
+    try:
+        plays = _sort_by_edge(_load_all_today_plays())
+        plays = [p for p in plays if not game_has_started(p)]
+
+        game_plays = _filter_games(plays)
+        prop_plays = _filter_props(plays)
+        nrfi_plays = _filter_nrfi(plays)
+
+        top_game = game_plays[0] if game_plays else None
+        top_prop = prop_plays[0] if prop_plays else None
+        top_nrfi = nrfi_plays[0] if nrfi_plays else None
+
+        caption_lines = ["EDGE EQUATION — DAILY CARD", ""]
+
+        if top_game:
+            gotd_text = generate_gotd_from_play(top_game)
+            caption_lines.append("GAME OF THE DAY")
+            caption_lines.append(gotd_text)
+            caption_lines.append("")
+
+        if top_prop:
+            potd_text = generate_potd_from_play(top_prop)
+            caption_lines.append("PROP OF THE DAY")
+            caption_lines.append(potd_text)
+            caption_lines.append("")
+
+        if top_nrfi:
+            fi_text = generate_first_inning_from_play(top_nrfi)
+            caption_lines.append("FIRST INNING POTD")
+            caption_lines.append(fi_text)
+            caption_lines.append("")
+
+        caption_lines.append(get_daily_cta())
+        caption_lines.append("#EdgeEquation")
+
+        caption = "\n".join(caption_lines)
+
+        if not dry_run:
+            post_tweet(caption)
+            logger.info("Daily card posted")
+        else:
+            logger.info("[DRY RUN] Daily card:\n" + caption)
+
+    except Exception as e:
+        logger.error("Daily failed: " + str(e))
 
 
 def run_gotd(dry_run, no_graphic):
@@ -201,16 +260,14 @@ def run_gotd(dry_run, no_graphic):
             logger.info("No game-level edges for GOTD")
             return
 
-        post_text = generate_gotd_from_play(top_game)
-        if not post_text:
-            logger.warning("GOTD generation returned empty")
-            return
+        text = generate_gotd_from_play(top_game)
+        caption = "EDGE EQUATION — GAME OF THE DAY\n\n" + text
 
         if not dry_run:
-            post_tweet(post_text)
+            post_tweet(caption)
             logger.info("GOTD posted")
         else:
-            logger.info("[DRY RUN] GOTD:\n" + post_text)
+            logger.info("[DRY RUN] GOTD:\n" + caption)
 
     except Exception as e:
         logger.error("GOTD failed: " + str(e))
@@ -229,146 +286,25 @@ def run_potd(dry_run, no_graphic):
             logger.info("No prop edges for POTD")
             return
 
-        post_text = generate_potd_from_play(top_prop)
-        if not post_text:
-            logger.warning("POTD generation returned empty")
-            return
+        text = generate_potd_from_play(top_prop)
+        caption = "EDGE EQUATION — PROP OF THE DAY\n\n" + text
 
         if not dry_run:
-            post_tweet(post_text)
+            post_tweet(caption)
             logger.info("POTD posted")
         else:
-            logger.info("[DRY RUN] POTD:\n" + post_text)
+            logger.info("[DRY RUN] POTD:\n" + caption)
 
     except Exception as e:
         logger.error("POTD failed: " + str(e))
 
 
-def run_daily(dry_run, no_graphic):
-    logger.info("MODE: daily")
-
-    logger.info("Fetching projections...")
-    mlb_games = get_mlb_game_projections()
-    mlb_pitchers = get_mlb_pitcher_projections()
-    nba_games = get_nba_game_projections()
-    nhl_games = get_nhl_game_projections()
-    nrfi_plays = calculate_nrfi_plays() or []
-
-    logger.info("Fetching overseas projections...")
-    kbo_games = get_kbo_projections()
-    npb_games = get_npb_projections()
-    epl_games = get_epl_projections()
-    ucl_games = get_ucl_projections()
-
-    props = _fetch_props()
-    graded_props = grade_all_props(props) if props else []
-    all_plays = graded_props + nrfi_plays
-
-    if all_plays:
-        all_plays = apply_kelly_to_plays(all_plays)
-        save_plays(all_plays, "ee")
-        all_plays = track_clv_for_plays(all_plays)
-
-    # Guardrail
-    def filter_started(games):
-        safe = []
-        for g in games:
-            if game_has_started(g):
-                logger.info(f"Skipping {g.get('matchup')} — already started or final")
-            else:
-                safe.append(g)
-        return safe
-
-    mlb_games = filter_started(mlb_games)
-    mlb_pitchers = filter_started(mlb_pitchers)
-    nba_games = filter_started(nba_games)
-    nhl_games = filter_started(nhl_games)
-    kbo_games = filter_started(kbo_games)
-    npb_games = filter_started(npb_games)
-    epl_games = filter_started(epl_games)
-    ucl_games = filter_started(ucl_games)
-
-    # Validation
-    def validate_projection(g):
-        if not g.get("vegas_total"):
-            logger.info(f"Skipping {g.get('matchup')} — missing Vegas line")
-            return False
-        if g.get("model_total") == g.get("vegas_total"):
-            logger.info(f"Skipping {g.get('matchup')} — duplicated model/market values")
-            return False
-        return True
-
-    mlb_games = [g for g in mlb_games if validate_projection(g)]
-    nba_games = [g for g in nba_games if validate_projection(g)]
-    nhl_games = [g for g in nhl_games if validate_projection(g)]
-
-    # Build parlays
-    try:
-        from engine.parlay_engine import evaluate_game_for_parlay, get_todays_games
-        game_bets = []
-        for game in get_todays_games():
-            game_bets.extend(evaluate_game_for_parlay(game))
-        personal_parlay = build_personal_parlay(game_bets)
-    except Exception as e:
-        logger.error("Personal parlay failed: " + str(e))
-        personal_parlay = None
-
-    personal_pp = build_personal_prizepicks(all_plays)
-    bankroll = get_bankroll_summary()
-    all_time = build_all_time_stats(style="ee")
-
-    if not dry_run:
-        if mlb_games:
-            post_tweet(generate_mlb_projection_post(mlb_games))
-        if mlb_pitchers:
-            post_tweet(generate_pitcher_projection_post(mlb_pitchers))
-        if nba_games:
-            post_tweet(generate_nba_projection_post(nba_games))
-        if nhl_games:
-            post_tweet(generate_nhl_projection_post(nhl_games))
-        if nrfi_plays:
-            post_tweet(generate_nrfi_probability_post(nrfi_plays))
-
-        if kbo_games:
-            post_tweet(generate_kbo_projection_post(kbo_games))
-        if npb_games:
-            post_tweet(generate_npb_projection_post(npb_games))
-        if epl_games:
-            post_tweet(generate_epl_projection_post(epl_games))
-        if ucl_games:
-            post_tweet(generate_ucl_projection_post(ucl_games))
-
-        send_projections_only_email(
-            mlb_games=mlb_games, mlb_pitchers=mlb_pitchers,
-            nba_games=nba_games, nhl_games=nhl_games,
-            nrfi_plays=nrfi_plays,
-            personal_parlay=personal_parlay, personal_pp=personal_pp,
-            bankroll_summary=bankroll, all_time_stats=all_time,
-        )
-        logger.info("Email sent")
-
-    else:
-        logger.info("[DRY RUN] Daily projections completed")
-
-
 def run_results(dry_run, no_graphic):
     logger.info("MODE: results")
     try:
-        results = check_all_results(style="ee", date_str=_today())
-        verified = [r for r in results if r.get("result_checked")] if results else []
+        from engine.results_loader import get_todays_graded_plays
 
-        if verified:
-            save_results(verified, style="ee")
-            results_text = generate_results_post(verified)
-
-            if not dry_run:
-                post_tweet(results_text)
-                send_results_email(verified)
-            else:
-                logger.info("[DRY RUN] Results:\n" + results_text)
-
-        from engine.data_tracker import load_plays
-        todays_plays = load_plays(_today(), "ee")
+        todays_plays = get_todays_graded_plays() or []
 
         mlb_game_projs = [
             p for p in todays_plays
@@ -391,7 +327,7 @@ def run_results(dry_run, no_graphic):
 
             called_it_game = generate_called_it_post(game_hits, "game")
             if called_it_game:
-                post_tweet(called_it_game)
+                post_tweet(called_it)
 
             accuracy = generate_daily_accuracy_post(
                 game_hits, game_misses,
@@ -402,11 +338,6 @@ def run_results(dry_run, no_graphic):
 
         else:
             logger.info("[DRY RUN] Accuracy calculated")
-
-        from engine.global_accuracy import (
-            evaluate_global_results,
-            generate_global_accuracy_post
-        )
 
         global_plays = [
             p for p in todays_plays
@@ -443,15 +374,18 @@ def run_weekly(dry_run, no_graphic):
 def run_monthly(dry_run, no_graphic):
     logger.info("MODE: monthly")
     stats = build_all_time_stats(style="ee")
-    caption = f"EDGE EQUATION — Monthly Summary\n\nTotal graded outputs: {stats.get('total', 0)}"
+    caption = (
+        "EDGE EQUATION — Monthly Summary\n\n"
+        f"Total graded outputs: {stats.get('total', 0)}"
+    )
 
     if not dry_run:
         post_tweet(caption)
     else:
         logger.info("[DRY RUN] Monthly:\n" + caption)
 
-    
-    # ============================================================
+
+# ============================================================
 # EDGE EQUATION 3.0 — US SIGNAL MODES
 # ============================================================
 
@@ -529,14 +463,19 @@ def run_run_suppression_signal(dry_run, no_graphic):
         plays = _sort_by_edge(_load_all_today_plays())
         plays = [p for p in plays if not game_has_started(p)]
 
-        nrfi_plays = _filter_nrfi(plays)
-        top_nrfi = nrfi_plays[0] if nrfi_plays else None
+        game_plays = _filter_games(plays)
+        low_total_games = [
+            p for p in game_plays
+            if p.get("market") == "total" and p.get("edge", 0) < 0
+        ]
 
-        if not top_nrfi:
-            logger.info("No NRFI/YRFI edges for Run Suppression Signal")
+        top_game = low_total_games[0] if low_total_games else None
+
+        if not top_game:
+            logger.info("No run suppression edges found")
             return
 
-        text = generate_first_inning_from_play(top_nrfi)
+        text = generate_gotd_from_play(top_game)
         caption = "EDGE EQUATION 3.0 — RUN SUPPRESSION SIGNAL\n\n" + text
 
         logger.info("[DRY RUN] Run Suppression Signal:\n" + caption)
@@ -551,19 +490,24 @@ def run_high_confidence_outlier(dry_run, no_graphic):
         plays = _sort_by_edge(_load_all_today_plays())
         plays = [p for p in plays if not game_has_started(p)]
 
-        top_play = plays[0]
+        strong_edges = [p for p in plays if p.get("edge", 0) >= 0.10]
+        top_play = strong_edges[0] if strong_edges else None
 
-        if top_play.get("prop_label") in ("K", "SOG", "3PM", "PTS", "AST", "REB"):
+        if not top_play:
+            logger.info("No high-confidence outliers found")
+            return
+
+        if top_play.get("prop_label") in ("K", "HITS", "TOTAL_BASES", "HOME_RUNS"):
             text = generate_potd_from_play(top_play)
         else:
             text = generate_gotd_from_play(top_play)
 
-        caption = "EDGE EQUATION 3.0 — HIGH-CONFIDENCE OUTLIER\n\n" + text
+        caption = "EDGE EQUATION 3.0 — HIGH CONFIDENCE OUTLIER\n\n" + text
 
-        logger.info("[DRY RUN] High-Confidence Outlier:\n" + caption)
+        logger.info("[DRY RUN] High Confidence Outlier:\n" + caption)
 
     except Exception as e:
-        logger.error("High-Confidence Outlier failed: " + str(e))
+        logger.error("High Confidence Outlier failed: " + str(e))
 
 
 def run_secondary_alignment(dry_run, no_graphic):
@@ -572,18 +516,36 @@ def run_secondary_alignment(dry_run, no_graphic):
         plays = _sort_by_edge(_load_all_today_plays())
         plays = [p for p in plays if not game_has_started(p)]
 
-        if len(plays) < 2:
-            logger.info("Not enough plays for Secondary Alignment")
+        game_plays = _filter_games(plays)
+        prop_plays = _filter_props(plays)
+
+        aligned = []
+        for g in game_plays:
+            for p in prop_plays:
+                if (
+                    g.get("game_id") == p.get("game_id")
+                    and g.get("side") == p.get("side")
+                ):
+                    aligned.append((g, p))
+
+        if not aligned:
+            logger.info("No secondary alignment edges found")
             return
 
-        second = plays[1]
+        top_game, top_prop = aligned[0]
 
-        if second.get("prop_label") in ("K", "SOG", "3PM", "PTS", "AST", "REB"):
-            text = generate_potd_from_play(second)
-        else:
-            text = generate_gotd_from_play(second)
+        game_text = generate_gotd_from_play(top_game)
+        prop_text = generate_potd_from_play(top_prop)
 
-        caption = "EDGE EQUATION 3.0 — SECONDARY ALIGNMENT\n\n" + text
+        caption = "\n".join([
+            "EDGE EQUATION 3.0 — SECONDARY ALIGNMENT",
+            "",
+            "GAME EDGE",
+            game_text,
+            "",
+            "PROP EDGE",
+            prop_text,
+        ])
 
         logger.info("[DRY RUN] Secondary Alignment:\n" + caption)
 
@@ -592,131 +554,170 @@ def run_secondary_alignment(dry_run, no_graphic):
 
 
 # ============================================================
-# EDGE EQUATION 3.0 — GLOBAL (OVERNIGHT) SIGNAL MODES
+# EDGE EQUATION 3.0 — GLOBAL SIGNAL MODES
 # ============================================================
-
-def _load_global_games():
-    kbo = get_kbo_projections()
-    npb = get_npb_projections()
-    epl = get_epl_projections()
-    ucl = get_ucl_projections()
-    return kbo + npb + epl + ucl
-
-
-def _filter_started_global(games):
-    safe = []
-    for g in games:
-        if game_has_started(g):
-            logger.info(f"Skipping {g.get('matchup')} — already started or final")
-        else:
-            safe.append(g)
-    return safe
-
-
-def _validate_global(g):
-    if not g.get("vegas_total"):
-        return False
-    if g.get("model_total") == g.get("vegas_total"):
-        return False
-    return True
-
 
 def run_global_primary_signal(dry_run, no_graphic):
     logger.info("MODE: global_primary_signal")
+    try:
+        plays = _sort_by_edge(_load_all_today_plays())
+        plays = [
+            p for p in plays
+            if p.get("sport") in ("kbo", "npb", "soccer_epl", "soccer_ucl")
+            and not game_has_started(p)
+        ]
 
-    games = _filter_started_global(_load_global_games())
-    games = [g for g in games if _validate_global(g)]
+        game_plays = _filter_games(plays)
+        top_game = game_plays[0] if game_plays else None
 
-    if not games:
-        logger.info("No global games available")
-        return
+        if not top_game:
+            logger.info("No global game-level edges for Primary Signal")
+            return
 
-    games.sort(key=lambda x: -abs(x.get("model_total", 0) - x.get("vegas_total", 0)))
-    top = games[0]
+        text = generate_gotd_from_play(top_game)
+        caption = "EDGE EQUATION GLOBAL — PRIMARY SIGNAL\n\n" + text
 
-    text = generate_gotd_from_play(top)
-    caption = "EDGE EQUATION 3.0 — GLOBAL PRIMARY SIGNAL\n\n" + text
+        logger.info("[DRY RUN] Global Primary Signal:\n" + caption)
 
-    logger.info("[DRY RUN] Global Primary Signal:\n" + caption)
+    except Exception as e:
+        logger.error("Global Primary Signal failed: " + str(e))
 
 
 def run_global_prop_efficiency_signal(dry_run, no_graphic):
     logger.info("MODE: global_prop_efficiency_signal")
+    try:
+        plays = _sort_by_edge(_load_all_today_plays())
+        plays = [
+            p for p in plays
+            if p.get("sport") in ("kbo", "npb", "soccer_epl", "soccer_ucl")
+            and not game_has_started(p)
+        ]
 
-    plays = _sort_by_edge(_load_all_today_plays())
-    plays = [p for p in plays if not game_has_started(p)]
+        prop_plays = _filter_props(plays)
+        top_prop = prop_plays[0] if prop_plays else None
 
-    props = _filter_props(plays)
+        if not top_prop:
+            logger.info("No global prop edges for Prop Efficiency Signal")
+            return
 
-    if not props:
-        logger.info("No global props available")
-        return
+        text = generate_potd_from_play(top_prop)
+        caption = "EDGE EQUATION GLOBAL — PROP EFFICIENCY SIGNAL\n\n" + text
 
-    top = props[0]
-    text = generate_potd_from_play(top)
-    caption = "EDGE EQUATION 3.0 — GLOBAL PROP EFFICIENCY SIGNAL\n\n" + text
+        logger.info("[DRY RUN] Global Prop Efficiency Signal:\n" + caption)
 
-    logger.info("[DRY RUN] Global Prop Efficiency Signal:\n" + caption)
+    except Exception as e:
+        logger.error("Global Prop Efficiency Signal failed: " + str(e))
 
 
 def run_global_run_suppression_signal(dry_run, no_graphic):
     logger.info("MODE: global_run_suppression_signal")
+    try:
+        plays = _sort_by_edge(_load_all_today_plays())
+        plays = [
+            p for p in plays
+            if p.get("sport") in ("kbo", "npb", "soccer_epl", "soccer_ucl")
+            and not game_has_started(p)
+        ]
 
-    plays = _sort_by_edge(_load_all_today_plays())
-    plays = [p for p in plays if not game_has_started(p)]
+        game_plays = _filter_games(plays)
+        low_total_games = [
+            p for p in game_plays
+            if p.get("market") == "total" and p.get("edge", 0) < 0
+        ]
 
-    nrfi = _filter_nrfi(plays)
+        top_game = low_total_games[0] if low_total_games else None
 
-    if not nrfi:
-        logger.info("No global NRFI/YRFI plays")
-        return
+        if not top_game:
+            logger.info("No global run suppression edges found")
+            return
 
-    top = nrfi[0]
-    text = generate_first_inning_from_play(top)
-    caption = "EDGE EQUATION 3.0 — GLOBAL RUN SUPPRESSION SIGNAL\n\n" + text
+        text = generate_gotd_from_play(top_game)
+        caption = "EDGE EQUATION GLOBAL — RUN SUPPRESSION SIGNAL\n\n" + text
 
-    logger.info("[DRY RUN] Global Run Suppression Signal:\n" + caption)
+        logger.info("[DRY RUN] Global Run Suppression Signal:\n" + caption)
+
+    except Exception as e:
+        logger.error("Global Run Suppression Signal failed: " + str(e))
 
 
 def run_global_high_confidence_outlier(dry_run, no_graphic):
     logger.info("MODE: global_high_confidence_outlier")
+    try:
+        plays = _sort_by_edge(_load_all_today_plays())
+        plays = [
+            p for p in plays
+            if p.get("sport") in ("kbo", "npb", "soccer_epl", "soccer_ucl")
+            and not game_has_started(p)
+        ]
 
-    plays = _sort_by_edge(_load_all_today_plays())
-    plays = [p for p in plays if not game_has_started(p)]
+        strong_edges = [p for p in plays if p.get("edge", 0) >= 0.10]
+        top_play = strong_edges[0] if strong_edges else None
 
-    top = plays[0]
+        if not top_play:
+            logger.info("No global high-confidence outliers found")
+            return
 
-    if top.get("prop_label") in ("K", "SOG", "3PM", "PTS", "AST", "REB"):
-        text = generate_potd_from_play(top)
-    else:
-        text = generate_gotd_from_play(top)
+        if top_play.get("prop_label") in ("HITS", "TOTAL_BASES", "HOME_RUNS"):
+            text = generate_potd_from_play(top_play)
+        else:
+            text = generate_gotd_from_play(top_play)
 
-    caption = "EDGE EQUATION 3.0 — GLOBAL HIGH-CONFIDENCE OUTLIER\n\n" + text
+        caption = "EDGE EQUATION GLOBAL — HIGH CONFIDENCE OUTLIER\n\n" + text
 
-    logger.info("[DRY RUN] Global High-Confidence Outlier:\n" + caption)
+        logger.info("[DRY RUN] Global High Confidence Outlier:\n" + caption)
+
+    except Exception as e:
+        logger.error("Global High Confidence Outlier failed: " + str(e))
 
 
 def run_global_secondary_alignment(dry_run, no_graphic):
     logger.info("MODE: global_secondary_alignment")
+    try:
+        plays = _sort_by_edge(_load_all_today_plays())
+        plays = [
+            p for p in plays
+            if p.get("sport") in ("kbo", "npb", "soccer_epl", "soccer_ucl")
+            and not game_has_started(p)
+        ]
 
-    plays = _sort_by_edge(_load_all_today_plays())
-    plays = [p for p in plays if not game_has_started(p)]
+        game_plays = _filter_games(plays)
+        prop_plays = _filter_props(plays)
 
-    if len(plays) < 2:
-        logger.info("Not enough global plays")
-        return
+        aligned = []
+        for g in game_plays:
+            for p in prop_plays:
+                if (
+                    g.get("game_id") == p.get("game_id")
+                    and g.get("side") == p.get("side")
+                ):
+                    aligned.append((g, p))
 
-    second = plays[1]
+        if not aligned:
+            logger.info("No global secondary alignment edges found")
+            return
 
-    if second.get("prop_label") in ("K", "SOG", "3PM", "PTS", "AST", "REB"):
-        text = generate_potd_from_play(second)
-    else:
-        text = generate_gotd_from_play(second)
+        top_game, top_prop = aligned[0]
 
-    caption = "EDGE EQUATION 3.0 — GLOBAL SECONDARY ALIGNMENT\n\n" + text
+        game_text = generate_gotd_from_play(top_game)
+        prop_text = generate_potd_from_play(top_prop)
 
-    logger.info("[DRY RUN] Global Secondary Alignment:\n" + caption)
-    # ============================================================
+        caption = "\n".join([
+            "EDGE EQUATION GLOBAL — SECONDARY ALIGNMENT",
+            "",
+            "GAME EDGE",
+            game_text,
+            "",
+            "PROP EDGE",
+            prop_text,
+        ])
+
+        logger.info("[DRY RUN] Global Secondary Alignment:\n" + caption)
+
+    except Exception as e:
+        logger.error("Global Secondary Alignment failed: " + str(e))
+
+
+# ============================================================
 # MODES DICTIONARY — 3.0 ALIGNED
 # ============================================================
 
@@ -747,26 +748,21 @@ MODES_LEGACY = {
     "results": run_results,
     "weekly": run_weekly,
     "monthly": run_monthly,
-    "scan_game": run_scan_game,
-    "scan_prop": run_scan_prop,
-    "scan_nrfi": run_scan_nrfi,
-    "weekly_reminder": run_weekly_reminder,
-    "monthly_reminder": run_monthly_reminder,
-    "phase2": run_phase2,
-    "phase3": run_phase3,
-    "phase4": run_phase4,
 }
 
-# Final merged router
 MODES = {
     **MODES_US_3,
     **MODES_GLOBAL_3,
     **MODES_LEGACY,
 }
 
+
 # ============================================================
 # MODE SIGNATURE VALIDATION
 # ============================================================
+
+import inspect
+
 
 def validate_modes():
     for mode_name, fn in MODES.items():
@@ -791,7 +787,9 @@ def validate_modes():
                     f"Mode '{mode_name}' parameter '{r}' must be keyword-compatible"
                 )
 
+
 validate_modes()
+
 
 # ============================================================
 # MAIN
@@ -808,7 +806,6 @@ def main():
     MODES[args.mode](dry_run=args.dry_run, no_graphic=args.no_graphic)
     logger.info("Run complete.")
 
+
 if __name__ == "__main__":
     main()
-
-
