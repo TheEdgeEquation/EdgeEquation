@@ -378,6 +378,9 @@ def run_daily(dry_run, no_graphic):
 def run_results(dry_run, no_graphic):
     logger.info("MODE: results")
     try:
+        # -----------------------------
+        # 1. CHECK RESULTS
+        # -----------------------------
         results = check_all_results(style="ee", date_str=_today())
         verified = [r for r in results if r.get("result_checked")] if results else []
 
@@ -391,30 +394,44 @@ def run_results(dry_run, no_graphic):
             else:
                 logger.info("[DRY RUN] Results:\n" + results_text)
 
-        # Accuracy breakdown
+        # -----------------------------
+        # 2. LOAD TODAY'S PLAYS
+        # -----------------------------
         from engine.data_tracker import load_plays
         todays_plays = load_plays(_today(), "ee")
 
+        # -----------------------------
+        # 3. US ACCURACY — MLB GAME + PITCHER
+        # -----------------------------
         mlb_game_projs = [
             p for p in todays_plays
-            if p.get("sport") == "baseball_mlb" and p.get("prop_label") not in ("K", "NRFI", "YRFI")
+            if p.get("sport") == "baseball_mlb"
+            and p.get("prop_label") not in ("K", "NRFI", "YRFI")
         ]
-        pitcher_projs = [p for p in todays_plays if p.get("prop_label") == "K"]
+
+        pitcher_projs = [
+            p for p in todays_plays
+            if p.get("prop_label") == "K"
+        ]
 
         game_hits, game_misses = check_mlb_results(mlb_game_projs)
         pitcher_hits, pitcher_misses = check_pitcher_results(pitcher_projs)
 
         if not dry_run:
+            # Pitcher "Called It"
             called_it = generate_called_it_post(pitcher_hits, "pitcher")
             if called_it:
                 post_tweet(called_it)
 
+            # Game "Called It"
             called_it_game = generate_called_it_post(game_hits, "game")
             if called_it_game:
                 post_tweet(called_it_game)
 
+            # Daily accuracy post
             accuracy = generate_daily_accuracy_post(
-                game_hits, game_misses, pitcher_hits, pitcher_misses
+                game_hits, game_misses,
+                pitcher_hits, pitcher_misses
             )
             if accuracy:
                 post_tweet(accuracy)
@@ -422,8 +439,31 @@ def run_results(dry_run, no_graphic):
         else:
             logger.info("[DRY RUN] Accuracy calculated")
 
+        # -----------------------------
+        # 4. GLOBAL ACCURACY — KBO, NPB, EPL, UCL
+        # -----------------------------
+        from engine.global_accuracy import (
+            evaluate_global_results,
+            generate_global_accuracy_post
+        )
+
+        global_plays = [
+            p for p in todays_plays
+            if p.get("sport") in ("kbo", "npb", "soccer_epl", "soccer_ucl")
+        ]
+
+        global_stats = evaluate_global_results(global_plays)
+
+        if not dry_run:
+            global_accuracy_post = generate_global_accuracy_post(global_stats)
+            if global_accuracy_post:
+                post_tweet(global_accuracy_post)
+        else:
+            logger.info("[DRY RUN] Global accuracy:\n" + str(global_stats))
+
     except Exception as e:
         logger.error("Results failed: " + str(e))
+
 
 
 def run_weekly(dry_run, no_graphic):
