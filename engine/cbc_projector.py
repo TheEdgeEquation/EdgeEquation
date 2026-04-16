@@ -54,7 +54,9 @@ def get_epl_projections():
         return projections
     except Exception as e:
         logger.error("EPL projections failed: " + str(e))
-        return []
+        from engine.global_clv_helper import attach_clv_to_list
+return attach_clv_to_list(games)
+
  
  
 def get_ucl_projections():
