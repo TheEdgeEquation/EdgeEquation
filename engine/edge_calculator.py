@@ -59,6 +59,67 @@ def calculate_true_lambda_mlb(prop):
     except Exception as e:
         logger.error("True lambda failed: " + str(e))
         return max(prop.get("true_lambda", prop.get("line", 5.0)), 0.1)
+     def calculate_true_lambda_batter(prop):
+    """
+    Generic batter lambda for counting stats:
+    HITS, TOTAL_BASES, HOME_RUNS, RBI, RUNS, etc.
+    """
+    try:
+        from engine.stats.mlb_batter import get_full_batter_profile
+        from engine.stats.weather import get_weather
+        from engine.stats.park_factors import get_batter_park_adjustment
+        from engine.stats.pitcher_matchup import get_pitcher_matchup_adjustment
+
+        player = prop.get("player", "")
+        team = prop.get("team", "")
+        opponent = prop.get("opponent", "")
+        prop_label = prop.get("prop_label", "HITS")
+
+        profile = get_full_batter_profile(player, team, opponent)
+
+        # Base per-game expectation by prop type
+        if prop_label == "HITS":
+            base = profile.get("hits_per_game", 1.0)
+        elif prop_label == "TOTAL_BASES":
+            base = profile.get("tb_per_game", 2.0)
+        elif prop_label == "HOME_RUNS":
+            base = profile.get("hr_per_game", 0.25)
+        elif prop_label == "RBI":
+            base = profile.get("rbi_per_game", 0.8)
+        elif prop_label == "RUNS":
+            base = profile.get("runs_per_game", 0.8)
+        else:
+            base = profile.get("stat_per_game", 1.0)
+
+        pitcher_adj = get_pitcher_matchup_adjustment(profile)
+        park_adj = get_batter_park_adjustment(team)
+        weather = get_weather(team)
+        weather_adj = weather.get("run_env_adjustment", 1.0)
+
+        true_lambda = base * pitcher_adj * park_adj * weather_adj
+
+        logger.info(
+            "True lambda batter="
+            + player
+            + " prop="
+            + prop_label
+            + " lambda="
+            + str(round(true_lambda, 3))
+            + " (base="
+            + str(round(base, 3))
+            + " pitch="
+            + str(pitcher_adj)
+            + " park="
+            + str(park_adj)
+            + " wx="
+            + str(weather_adj)
+            + ")"
+        )
+        return round(max(true_lambda, 0.05), 3)
+    except Exception as e:
+        logger.error("True lambda batter failed: " + str(e))
+        return max(prop.get("true_lambda", prop.get("line", 1.0)), 0.05)
+
  
  
 def calculate_edge(prop):
@@ -66,30 +127,45 @@ def calculate_edge(prop):
     line = prop.get("line", 0.0)
     implied_prob = prop.get("implied_prob", 0.5)
     true_lambda = prop.get("true_lambda", None)
+    prop_label = prop.get("prop_label", "")
+
     if true_lambda is None:
-        if sport == "baseball_mlb":
+        if sport.startswith("baseball_") and prop_label in (
+            "HITS",
+            "TOTAL_BASES",
+            "HOME_RUNS",
+            "RBI",
+            "RUNS",
+        ):
+            true_lambda = calculate_true_lambda_batter(prop)
+        elif sport == "baseball_mlb":
             true_lambda = calculate_true_lambda_mlb(prop)
         else:
             true_lambda = max(line, 0.1)
+
     over_sim_prob = run_monte_carlo(true_lambda, line)
     over_edge = round(over_sim_prob - implied_prob, 4)
     under_sim_prob = round(1 - over_sim_prob, 4)
     under_implied = round(1 - implied_prob, 4)
     under_edge = round(under_sim_prob - under_implied, 4)
+
     best_edge = over_edge
     best_direction = "OVER"
     best_sim_prob = over_sim_prob
     best_implied = implied_prob
     best_odds = prop.get("over_odds", -110)
+
     if under_edge > over_edge and under_edge >= 0.04:
         best_edge = under_edge
         best_direction = "UNDER"
         best_sim_prob = under_sim_prob
         best_implied = under_implied
         best_odds = prop.get("under_odds", -110)
+
     grade_result = assign_grade(best_edge)
     if grade_result is None:
         return None
+
     grade, score, play_label = grade_result
     return {
         **prop,
@@ -107,6 +183,7 @@ def calculate_edge(prop):
         "over_edge": over_edge,
         "under_edge": under_edge,
     }
+
  
  
 def calculate_nrfi_plays(style="ee"):
