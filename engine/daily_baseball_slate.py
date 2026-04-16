@@ -1,3 +1,17 @@
+from datetime import datetime, timezone
+import dateutil.parser
+
+def is_evening_game(commence_time, cutoff_hour=18):
+    """
+    Returns True if the game starts at or after 6 PM local time.
+    """
+    try:
+        dt = dateutil.parser.isoparse(commence_time)
+        local = dt.astimezone()  # convert to local timezone
+        return local.hour >= cutoff_hour
+    except Exception:
+        return True  # fail open
+
 from engine.edge_calculator import calculate_nrfi_plays, grade_all_props
 from engine.prop_generator import generate_k_props
 from engine.baseball_batter_props import generate_all_baseball_batter_props
