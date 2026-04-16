@@ -65,3 +65,30 @@ def get_altitude_adjustment(home_team):
     elif alt > 1000:
         return 0.98
     return 1.0
+
+def get_batter_park_adjustment(team, prop_label):
+    """
+    Returns a park factor multiplier for HR, TB, hits, etc.
+    """
+    # Example MLB park factors (you can expand later)
+    PARK_HR = {
+        "Coors Field": 1.25,
+        "Yankee Stadium": 1.18,
+        "Globe Life Field": 1.12,
+        "T-Mobile Park": 0.88,
+        "Oracle Park": 0.82,
+    }
+
+    PARK_HITS = {
+        "Coors Field": 1.15,
+        "Fenway Park": 1.12,
+        "Yankee Stadium": 1.05,
+        "T-Mobile Park": 0.92,
+        "Oracle Park": 0.90,
+    }
+
+    if prop_label == "HOME_RUNS":
+        return PARK_HR.get(team, 1.0)
+    else:
+        return PARK_HITS.get(team, 1.0)
+
