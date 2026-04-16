@@ -279,8 +279,8 @@ for play in prop_plays:
 
 top_prop = cleaned[0] if cleaned else None
 
-
-        if top_prop:
+try:
+    if top_prop:
             post_text = generate_potd_from_play(top_prop)
             if post_text:
                 if not dry_run:
