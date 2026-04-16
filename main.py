@@ -85,7 +85,7 @@ def _today():
     return datetime.now().strftime("%Y%m%d")
 
 
-def _fetch_props():
+ef _fetch_props():
     """
     Fetch props with retry logic.
     """
