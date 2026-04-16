@@ -113,4 +113,6 @@ def get_kbo_projections(game_date: date = None):
     gd = game_date or get_kbo_game_date()
     games = scrape_kbo_schedule(gd)
     logger.info("KBO: " + str(len(games)) + " games found for " + str(gd))
-    return games
+    from engine.global_clv_helper import attach_clv_to_list
+return attach_clv_to_list(games)
+
