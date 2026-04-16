@@ -89,7 +89,11 @@ def get_ucl_projections():
         return projections
     except Exception as e:
         logger.error("UCL projections failed: " + str(e))
-        return []
+        def get_ucl_projections():
+    ...
+    from engine.global_clv_helper import attach_clv_to_list
+    return attach_clv_to_list(games)
+
  
  
 def _project_soccer_score(home_team, away_team):
