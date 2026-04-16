@@ -1,0 +1,27 @@
+Create a premium, dark‑mode baseball results graphic titled:
+“EDGE EQUATION — RESULTS CHECK”
+
+Purpose:
+Visualize how the model performed on completed games.
+
+Sections:
+1. Best Hit of the Day
+   - Matchup or player
+   - Projection vs actual
+   - Error
+   - Arrow correctness (if applicable)
+
+2. Biggest Miss of the Day
+   - Same structure
+
+3. Summary Metrics:
+   - Game accuracy %
+   - Pitcher K accuracy %
+   - Arrow direction accuracy %
+
+Design:
+- Dark navy background
+- Gold highlight for best hit
+- Red highlight for biggest miss
+- Clean, minimal layout
+- “This is data. Not advice.” footer
