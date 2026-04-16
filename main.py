@@ -85,14 +85,22 @@ def _today():
     return datetime.now().strftime("%Y%m%d")
 
 
-ef _fetch_props():
+def _fetch_props():
     """
-    Fetch props with retry logic.
+    3.0 — PrizePicks-only, validated prop ingestion.
+    Removes retry logic and old generators.
     """
     from engine.prizepicks_scraper import fetch_prizepicks_props
-def _fetch_props():
+
     logger.info("Fetching props (PrizePicks validated)...")
-    return fetch_prizepicks_props()
+    props = fetch_prizepicks_props() or []
+
+    if not props:
+        logger.warning("No PrizePicks props returned — using empty list")
+        return []
+
+    return props
+
 
     for attempt in range(1, 5):
         logger.info(f"Fetch attempt {attempt} of 4")
