@@ -489,6 +489,20 @@ def run_monthly(dry_run, no_graphic):
         post_tweet(caption)
     else:
         logger.info("[DRY RUN] Monthly:\n" + caption)
+                # -----------------------------
+        # GLOBAL CLV TRACKING
+        # -----------------------------
+        from engine.global_clv import evaluate_global_clv, generate_global_clv_post
+
+        global_clv_stats = evaluate_global_clv(global_plays)
+
+        if not dry_run:
+            clv_post = generate_global_clv_post(global_clv_stats)
+            if clv_post:
+                post_tweet(clv_post)
+        else:
+            logger.info("[DRY RUN] Global CLV:\n" + str(global_clv_stats))
+
 
 
 # ============================================================
