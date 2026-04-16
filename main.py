@@ -245,7 +245,7 @@ def run_potd(dry_run, no_graphic):
     logger.info("MODE: potd")
 
     try:
-    if not dry_run:
+        if not dry_run:
         post_tweet(post_text)
         logger.info("GOTD posted")
     else:
