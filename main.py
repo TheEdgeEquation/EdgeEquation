@@ -255,8 +255,27 @@ def run_potd(dry_run, no_graphic):
 
         all_plays.sort(key=lambda x: -x.get("edge", 0))
 
-        prop_plays = _filter_props(all_plays)
-        top_prop = prop_plays[0] if prop_plays else None
+        prop_plays = _filter_props(plays)
+
+cleaned = []
+for play in prop_plays:
+    # Exclude NRFI/YRFI from POTD
+    if play.get("prop_label") in ("NRFI", "YRFI"):
+        continue
+    cleaned.append(play)
+
+top_prop = cleaned[0] if cleaned else None
+
+
+cleaned = []
+for play in prop_plays:
+    # Exclude NRFI/YRFI from POTD
+    if play.get("prop_label") in ("NRFI", "YRFI"):
+        continue
+    cleaned.append(play)
+
+top_prop = cleaned[0] if cleaned else None
+
 
         if top_prop:
             post_text = generate_potd_from_play(top_prop)
