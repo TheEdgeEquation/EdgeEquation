@@ -108,15 +108,30 @@ def _project_kbo_score(home_team, away_team):
     away = round(LEAGUE_AVG_KBO_RUNS * 0.97, 1)
     return home, away
  
- 
-def get_kbo_projections(game_date: date = None):
-    gd = game_date or get_kbo_game_date()
-    games = scrape_kbo_schedule(gd)
-    logger.info("KBO: " + str(len(games)) + " games found for " + str(gd))
-    from engine.global_clv_helper import attach_clv_to_list
-return attach_clv_to_list(games)
-from engine.global_validator import validate_global_list
-games = validate_global_list(games)
+ def get_kbo_projections():
+    try:
+        today_kst = (datetime.now() + timedelta(hours=14)).strftime("%Y-%m-%d")
+        logger.info("KBO: scraping MyKBOStats for KST date " + today_kst)
+        projections = _scrape_kbo()
+        if not projections:
+            logger.info("KBO: no games found today")
+        logger.info("KBO projections: " + str(len(projections)) + " games")
 
-return games
+        # --- GLOBAL CLV ---
+        from engine.global_clv_helper import attach_clv_to_list
+        projections = attach_clv_to_list(projections)
+
+        # --- GLOBAL VALIDATION ---
+        from engine.global_validator import validate_global_list
+        projections = validate_global_list(projections)
+
+        # --- GLOBAL SCHEMA ENFORCER ---
+        from engine.global_schema_enforcer import enforce_schema_list
+        projections = enforce_schema_list(projections)
+
+        return projections
+
+    except Exception as e:
+        logger.error("KBO projections failed: " + str(e))
+        return []
 
