@@ -893,6 +893,37 @@ MODES_LEGACY = {
     "phase3": run_phase3,
     "phase4": run_phase4,
 }
+import inspect
+
+def validate_modes():
+    """
+    Ensures every mode in MODES:
+    - is callable
+    - accepts dry_run and no_graphic keyword arguments
+    - has no missing or extra required parameters
+    """
+    for mode_name, fn in MODES.items():
+        if not callable(fn):
+            raise TypeError(f"Mode '{mode_name}' is not callable")
+
+        sig = inspect.signature(fn)
+        params = sig.parameters
+
+        # Required parameters
+        required = ["dry_run", "no_graphic"]
+
+        for r in required:
+            if r not in params:
+                raise TypeError(
+                    f"Mode '{mode_name}' must accept '{r}' as a parameter"
+                )
+
+        # Ensure they are keyword-compatible
+        for r in required:
+            p = params[r]
+            if p.kind not in (p.KEYWORD_ONLY, p.POSITIONAL_OR_KEYWORD):
+                raise TypeError(
+                    f"Mode '{mode_name}' parameter '{r}' must be keyword compayible")
 
 
 # ============================================================
