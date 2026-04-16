@@ -248,8 +248,8 @@ def run_potd(dry_run, no_graphic):
         if not dry_run:
             post_tweet(post_text)
             logger.info("GOTD posted")
-    else:
-        logger.info("[DRY RUN] GOTD:\n" + post_text)
+        else:
+            logger.info("[DRY RUN] GOTD:\n" + post_text)
 except Exception as e:
     logger.error("comp failed: " + str(e))
 
