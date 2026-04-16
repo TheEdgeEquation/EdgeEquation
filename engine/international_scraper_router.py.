@@ -1,0 +1,37 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Import league-specific scrapers
+from international_scrapers import (
+    get_kbo_projections,
+    get_npb_projections,
+)
+
+# Map sport → projection function
+SCRAPER_MAP = {
+    "kbo": get_kbo_projections,
+    "npb": get_npb_projections,
+}
+
+
+def get_international_projections(sport: str, game_date=None):
+    """
+    Unified entrypoint for all international baseball scrapers.
+    Example:
+        get_international_projections("kbo")
+        get_international_projections("npb")
+    """
+    sport_key = sport.lower().strip()
+
+    if sport_key not in SCRAPER_MAP:
+        logger.error(f"Unknown international sport: {sport}")
+        return []
+
+    try:
+        scraper = SCRAPER_MAP[sport_key]
+        return scraper(game_date)
+
+    except Exception as e:
+        logger.error(f"International scraper failed for {sport}: {e}")
+        return []
