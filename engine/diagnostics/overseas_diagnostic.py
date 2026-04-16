@@ -91,3 +91,6 @@ def run_overseas_diagnostic(game_date: date = None):
     print("\n==============================")
     print(" END OF DIAGNOSTIC")
     print("==============================\n")
+    if __name__ == "__main__":
+    run_overseas_diagnostic()
+
