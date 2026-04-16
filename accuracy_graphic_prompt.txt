@@ -1,0 +1,29 @@
+Create a premium, dark‑mode analytics graphic titled:
+“EDGE EQUATION — DAILY ACCURACY REPORT”
+
+Sections:
+1. Game Totals Accuracy
+   - Total games projected
+   - % within 15%
+   - Arrow direction accuracy
+
+2. Pitcher Ks Accuracy
+   - Total pitchers projected
+   - % within 1.5 Ks
+
+3. Best Game Projection
+   - Matchup
+   - Projected total vs actual
+   - Error
+
+4. Best Pitcher Projection
+   - Player
+   - Projected Ks vs actual
+   - Error
+
+Design:
+- Dark navy background
+- Neon green accents
+- Clean geometric layout
+- No gambling language
+- “Every projection tracked. Every result public.” footer
