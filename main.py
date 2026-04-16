@@ -134,7 +134,8 @@ def _sort_by_edge(plays):
 
 
 def _filter_props(plays):
-    return [p for p in plays if p.get("prop_label") in ("K", "SOG", "3PM", "PTS", "AST", "REB")]
+    return plays
+
 
 
 def _filter_nrfi(plays):
