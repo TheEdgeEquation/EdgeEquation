@@ -893,31 +893,6 @@ MODES_LEGACY = {
 }
 
 
-
-    # Essential legacy modes
-    "system_status": run_system_status,
-    "daily": run_daily,
-    "gotd": run_gotd,
-    "potd": run_potd,
-    "first_inning_potd": run_first_inning_potd,
-    "results": run_results,
-    "weekly": run_weekly,
-    "monthly": run_monthly,
-
-    # Scan modes
-    "scan_game": run_scan_game,
-    "scan_prop": run_scan_prop,
-    "scan_nrfi": run_scan_nrfi,
-
-    # Reminders
-    "weekly_reminder": run_weekly_reminder,
-    "monthly_reminder": run_monthly_reminder,
-    "phase2": run_phase2,
-    "phase3": run_phase3,
-    "phase4": run_phase4,
-}
-
-
 # ============================================================
 # MAIN
 # ============================================================
