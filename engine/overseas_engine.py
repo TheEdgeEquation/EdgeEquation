@@ -221,15 +221,6 @@ def fetch_npb_official_schedule(
     return games
 
 
-    # TODO: parse JSON
-    # Example:
-    # data = resp.json()
-    # for game in data["games"]:
-    #     ...
-    games: List[GameSchedule] = []
-
-    _debug_print(debug, f"[NPB OFFICIAL] Parsed games: {len(games)}")
-    return games
 
 
 # ==========================
