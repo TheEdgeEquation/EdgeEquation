@@ -5,6 +5,7 @@ logger = logging.getLogger(__name__)
 try:
     # Correct location: root-level post_to_x.py
     from post_to_x import send_tweet as _send_tweet
+
 except Exception:
     _send_tweet = None
 
