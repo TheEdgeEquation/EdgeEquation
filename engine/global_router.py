@@ -6,7 +6,6 @@ logger = logging.getLogger(__name__)
 from engine.baseball_router import get_baseball_projections
 
 # Basketball (placeholder imports — you plug in your real scrapers)
-from engine.nba_scraper import get_nba_projections
 
 # Football (NFL)
 from engine.nfl_scraper import get_nfl_projections
@@ -27,8 +26,6 @@ GLOBAL_SCRAPER_MAP = {
     "kbo": lambda date=None: get_baseball_projections("kbo", date),
     "npb": lambda date=None: get_baseball_projections("npb", date),
 
-    # Basketball
-    "nba": get_nba_projections,
 
     # Football
     "nfl": get_nfl_projections,
