@@ -243,11 +243,16 @@ def run_gotd(dry_run, no_graphic):
 
 def run_potd(dry_run, no_graphic):
     logger.info("MODE: potd")
+
     try:
-        props = _fetch_props()
-        graded = grade_all_props(props) if props else []
-        nrfi = calculate_nrfi_plays() or []
-        all_plays = graded + nrfi
+    if not dry_run:
+        post_tweet(post_text)
+        logger.info("GOTD posted")
+    else:
+        logger.info("[DRY RUN] GOTD:\n" + post_text)
+except Exception as e:
+    logger.error("GOTD failed: " + str(e))
+
 
         if not all_plays:
             logger.info("No plays for POTD")
