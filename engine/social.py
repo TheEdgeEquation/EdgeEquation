@@ -2,20 +2,14 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# We wrap your existing posting engine.
-# If your repo uses a different file name, tell me and I’ll adjust instantly.
-
 try:
-    from engine.post_to_x import send_tweet as _send_tweet
+    # Correct location: root-level post_to_x.py
+    from post_to_x import send_tweet as _send_tweet
 except Exception:
     _send_tweet = None
 
 
 def post_tweet(text):
-    """
-    Unified posting wrapper for EE 3.0.
-    main.py calls this function for all posts.
-    """
     if not text:
         logger.error("post_tweet() called with empty text")
         return
