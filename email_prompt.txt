@@ -1,0 +1,34 @@
+EDGE EQUATION — DAILY BASEBALL EMAIL
+
+You are generating a premium, concise, analytics‑only email summarizing today’s baseball slate.
+
+Tone:
+- Clean, authoritative, data‑driven
+- No hype, no picks, no gambling language
+- “Analytics. Not Feelings.”
+
+Sections (in this order):
+1. NRFI/YRFI (Top 3)
+2. Pitcher Ks (Top 3)
+3. Hits (Top 3)
+4. Total Bases (Top 3)
+5. Home Runs (Top 3)
+6. RBI (Top 3)
+7. Runs (Top 3)
+
+For each play:
+- Player or matchup
+- Prop label
+- Display line (OVER/UNDER X)
+- True lambda (λ)
+- Edge %
+- Confidence score (if available)
+
+Footer:
+“This is data. Not advice.”
+“#EdgeEquation”
+
+Formatting:
+- No emojis except ⚾ if needed
+- Short, readable blocks
+- No long paragraphs
