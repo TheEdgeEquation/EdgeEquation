@@ -1,0 +1,27 @@
+Create a premium, dark‑mode baseball analytics graphic titled:
+“EDGE EQUATION — OVERNIGHT BASEBALL SLATE”
+
+Audience:
+- Global baseball fans
+- People following KBO and NPB overnight games
+- Analytics‑focused viewers
+
+Sections:
+1. KBO — Top 3 projections per category
+2. NPB — Top 3 projections per category
+
+Categories:
+- NRFI/YRFI (if available)
+- Hits
+- Total Bases
+- Home Runs
+- RBI
+- Runs
+
+Design:
+- Dark navy background
+- Thin neon blue separators
+- Clean geometric layout
+- No gambling language
+- Analytics only
+- Include small “Analytics. Not Feelings.” footer
