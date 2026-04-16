@@ -715,4 +715,99 @@ def run_global_secondary_alignment(dry_run, no_graphic):
     caption = "EDGE EQUATION 3.0 — GLOBAL SECONDARY ALIGNMENT\n\n" + text
 
     logger.info("[DRY RUN] Global Secondary Alignment:\n" + caption)
+    # ============================================================
+# MODES DICTIONARY — 3.0 ALIGNED
+# ============================================================
+
+MODES_US_3 = {
+    "model_notes": run_model_notes,
+    "primary_signal": run_primary_signal,
+    "prop_efficiency_signal": run_prop_efficiency_signal,
+    "run_suppression_signal": run_run_suppression_signal,
+    "high_confidence_outlier": run_high_confidence_outlier,
+    "secondary_alignment": run_secondary_alignment,
+}
+
+MODES_GLOBAL_3 = {
+    "global_primary_signal": run_global_primary_signal,
+    "global_prop_efficiency_signal": run_global_prop_efficiency_signal,
+    "global_run_suppression_signal": run_global_run_suppression_signal,
+    "global_high_confidence_outlier": run_global_high_confidence_outlier,
+    "global_secondary_alignment": run_global_secondary_alignment,
+}
+
+MODES_LEGACY = {
+    "daily_email": run_daily_email,
+    "system_status": run_system_status,
+    "daily": run_daily,
+    "gotd": run_gotd,
+    "potd": run_potd,
+    "first_inning_potd": run_first_inning_potd,
+    "results": run_results,
+    "weekly": run_weekly,
+    "monthly": run_monthly,
+    "scan_game": run_scan_game,
+    "scan_prop": run_scan_prop,
+    "scan_nrfi": run_scan_nrfi,
+    "weekly_reminder": run_weekly_reminder,
+    "monthly_reminder": run_monthly_reminder,
+    "phase2": run_phase2,
+    "phase3": run_phase3,
+    "phase4": run_phase4,
+}
+
+# Final merged router
+MODES = {
+    **MODES_US_3,
+    **MODES_GLOBAL_3,
+    **MODES_LEGACY,
+}
+
+# ============================================================
+# MODE SIGNATURE VALIDATION
+# ============================================================
+
+def validate_modes():
+    for mode_name, fn in MODES.items():
+        if not callable(fn):
+            raise TypeError(f"Mode '{mode_name}' is not callable")
+
+        sig = inspect.signature(fn)
+        params = sig.parameters
+
+        required = ["dry_run", "no_graphic"]
+
+        for r in required:
+            if r not in params:
+                raise TypeError(
+                    f"Mode '{mode_name}' must accept '{r}' as a parameter"
+                )
+
+        for r in required:
+            p = params[r]
+            if p.kind not in (p.KEYWORD_ONLY, p.POSITIONAL_OR_KEYWORD):
+                raise TypeError(
+                    f"Mode '{mode_name}' parameter '{r}' must be keyword-compatible"
+                )
+
+validate_modes()
+
+# ============================================================
+# MAIN
+# ============================================================
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--mode", required=True, choices=list(MODES.keys()))
+    parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--no-graphic", action="store_true")
+    args = parser.parse_args()
+
+    logger.info(f"Starting | mode={args.mode} | dry_run={args.dry_run}")
+    MODES[args.mode](dry_run=args.dry_run, no_graphic=args.no_graphic)
+    logger.info("Run complete.")
+
+if __name__ == "__main__":
+    main()
+
 
