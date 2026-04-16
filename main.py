@@ -853,29 +853,46 @@ def run_daily_email(dry_run, no_graphic):
 
 
 # ============================================================
-# MODES DICTIONARY — 3.0 FIRST
-# ============================================================
+# MODES DICTIONARY — 3.0 alignment": run_global_secondary_alignment,
 
-MODES = {
-    # 3.0 US Suite
+
+
+    MODES_US_3 = {
     "model_notes": run_model_notes,
     "primary_signal": run_primary_signal,
     "prop_efficiency_signal": run_prop_efficiency_signal,
     "run_suppression_signal": run_run_suppression_signal,
     "high_confidence_outlier": run_high_confidence_outlier,
     "secondary_alignment": run_secondary_alignment,
-
-    # 3.0 Global Suite
+}
+MODES_GLOBAL_3 = {
     "global_primary_signal": run_global_primary_signal,
     "global_prop_efficiency_signal": run_global_prop_efficiency_signal,
     "global_run_suppression_signal": run_global_run_suppression_signal,
     "global_high_confidence_outlier": run_global_high_confidence_outlier,
     "global_secondary_alignment": run_global_secondary_alignment,
-
-
-
-    # Daily email
+}
+MODES_LEGACY = {
     "daily_email": run_daily_email,
+    "system_status": run_system_status,
+    "daily": run_daily,
+    "gotd": run_gotd,
+    "potd": run_potd,
+    "first_inning_potd": run_first_inning_potd,
+    "results": run_results,
+    "weekly": run_weekly,
+    "monthly": run_monthly,
+    "scan_game": run_scan_game,
+    "scan_prop": run_scan_prop,
+    "scan_nrfi": run_scan_nrfi,
+    "weekly_reminder": run_weekly_reminder,
+    "monthly_reminder": run_monthly_reminder,
+    "phase2": run_phase2,
+    "phase3": run_phase3,
+    "phase4": run_phase4,
+}
+
+
 
     # Essential legacy modes
     "system_status": run_system_status,
