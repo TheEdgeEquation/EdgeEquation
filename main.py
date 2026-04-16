@@ -264,7 +264,6 @@ for play in prop_plays:
         continue
     cleaned.append(play)
 
-top_prop = cleaned[0] if cleaned else None
 
 
 cleaned = []
