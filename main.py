@@ -949,4 +949,7 @@ def main():
     MODES[args.mode](dry_run=args.dry_run, no_graphic=args.no_graphic)
     logger.info("Run complete.")
 
+if __name__ == "__main__":
+    main()
+
 
