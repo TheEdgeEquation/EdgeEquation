@@ -1,0 +1,33 @@
+Create a premium, dark-mode baseball analytics graphic titled:
+“EDGE EQUATION — BASEBALL SLATE”
+
+Sections (in this order):
+
+1. NRFI/YRFI (Top 3)
+   For each:
+   - Matchup
+   - NRFI/YRFI label
+   - Model probability
+   - True lambda
+   - Edge %
+
+2. Pitcher Ks (Top 3)
+   - Player
+   - Line
+   - True lambda
+   - Edge %
+
+3. Hits (Top 3)
+4. Total Bases (Top 3)
+5. Home Runs (Top 3)
+6. RBI (Top 3)
+7. Runs (Top 3)
+
+Design:
+- Dark navy background
+- Thin neon green separators
+- Clean geometric layout
+- No gambling language
+- No picks
+- Analytics only
+- Include small “Analytics. Not Feelings.” footer
