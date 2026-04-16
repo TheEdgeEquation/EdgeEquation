@@ -22,45 +22,7 @@ def assign_grade(edge):
             return grade, score, label
     return None
  
- 
-def calculate_true_lambda_mlb(prop):
-    try:
-        from engine.stats.mlb_stats import get_full_pitcher_profile
-        from engine.stats.weather import get_weather
-        from engine.stats.umpire import get_umpire_for_game
-        from engine.stats.park_factors import get_k_factor, get_altitude_adjustment
-        from engine.stats.savant import get_blended_savant_stats, get_swstr_k_adjustment, get_pitch_mix_adjustment
-        player = prop.get("player", "")
-        home_team = prop.get("team", "")
-        away_team = prop.get("opponent", "")
-        profile = get_full_pitcher_profile(player, away_team, home_team)
-        k9_season = profile.get("k9_season", 8.0)
-        k9_recent = profile.get("k9_recent", k9_season)
-        avg_ip = profile.get("avg_ip_recent", 5.5)
-        k9_blended = (k9_recent * 0.60) + (k9_season * 0.40)
-        base_lambda = (k9_blended / 9.0) * avg_ip
-        opp_adj = profile.get("opp_k_adjustment", 1.0)
-        platoon_adj = profile.get("platoon_adjustment", 1.0)
-        weather = get_weather(home_team)
-        weather_adj = weather.get("k_adjustment", 1.0)
-        umpire_name, umpire_adj = get_umpire_for_game(home_team, away_team)
-        park_adj = get_k_factor(home_team)
-        alt_adj = get_altitude_adjustment(home_team)
-        player_id = profile.get("player_id")
-        swstr_adj = 1.0
-        pitch_mix_adj = 1.0
-        if player_id:
-            savant = get_blended_savant_stats(player_id)
-            swstr_adj = get_swstr_k_adjustment(savant.get("swstr_pct", 0.107))
-            pitch_mix_adj = get_pitch_mix_adjustment(savant.get("breaking_ball_pct", 0.28))
-        true_lambda = base_lambda * opp_adj * platoon_adj * weather_adj * umpire_adj * park_adj * alt_adj * swstr_adj * pitch_mix_adj
-        logger.info("True lambda=" + str(round(true_lambda, 3)) + " (opp=" + str(opp_adj) + " platoon=" + str(platoon_adj) + " wx=" + str(weather_adj) + " ump=" + str(umpire_adj) + " park=" + str(park_adj) + " swstr=" + str(swstr_adj) + ")")
-        return round(true_lambda, 3)
-    except Exception as e:
-        logger.error("True lambda failed: " + str(e))
-        return max(prop.get("true_lambda", prop.get("line", 5.0)), 0.1)
-     
-     def calculate_true_lambda_batter(prop):
+ def calculate_true_lambda_batter(prop):
     """
     Generic batter lambda for counting stats:
     HITS, TOTAL_BASES, HOME_RUNS, RBI, RUNS, etc.
@@ -101,22 +63,18 @@ def calculate_true_lambda_mlb(prop):
         true_lambda = base * pitcher_adj * park_adj * weather_adj
 
         logger.info(
-            "True lambda batter="
-            + player
-            + " prop="
-            + prop_label
-            + " lambda="
-            + str(round(true_lambda, 3))
-            + " (base="
-            + str(round(base, 3))
-            + " pitch="
-            + str(pitcher_adj)
-            + " park="
-            + str(park_adj)
-            + " wx="
-            + str(weather_adj)
-            + ")"
+            f"True lambda batter={player} prop={prop_label} "
+            f"lambda={round(true_lambda,3)} "
+            f"(base={round(base,3)} pitch={pitcher_adj} "
+            f"park={park_adj} wx={weather_adj})"
         )
+
+        return round(max(true_lambda, 0.05), 3)
+
+    except Exception as e:
+        logger.error("True lambda batter failed: " + str(e))
+        return max(prop.get("true_lambda", prop.get("line", 1.0)), 0.05)
+
         return round(max(true_lambda, 0.05), 3)
     except Exception as e:
         logger.error("True lambda batter failed: " + str(e))
