@@ -59,6 +59,7 @@ def calculate_true_lambda_mlb(prop):
     except Exception as e:
         logger.error("True lambda failed: " + str(e))
         return max(prop.get("true_lambda", prop.get("line", 5.0)), 0.1)
+     
      def calculate_true_lambda_batter(prop):
     """
     Generic batter lambda for counting stats:
@@ -92,7 +93,8 @@ def calculate_true_lambda_mlb(prop):
             base = profile.get("stat_per_game", 1.0)
 
         pitcher_adj = get_pitcher_matchup_adjustment(profile)
-        park_adj = get_batter_park_adjustment(team)
+        park_adj = get_batter_park_adjustment(team, prop_label)
+
         weather = get_weather(team)
         weather_adj = weather.get("run_env_adjustment", 1.0)
 
