@@ -853,7 +853,9 @@ def run_daily_email(dry_run, no_graphic):
 
 
 # ============================================================
-# MODES DICTIONARY — 3.0 alignment": run_global_secondary_alignment,
+# MODES DICTIONARY — 3.0 ALIGNED
+# ============================================================
+
 
 
 
