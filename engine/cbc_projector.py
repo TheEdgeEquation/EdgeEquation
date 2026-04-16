@@ -82,20 +82,22 @@ def get_ucl_projections():
 
 
  
- def get_ucl_projections():
+ def get_epl_projections():
     try:
         if not FOOTBALL_DATA_KEY:
+            logger.warning("FOOTBALL_DATA_KEY not set")
             return []
 
         today = datetime.now().strftime("%Y-%m-%d")
         tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
 
-        url = FOOTBALL_DATA_API + "/competitions/" + UCL_ID + "/matches"
+        url = FOOTBALL_DATA_API + "/competitions/" + EPL_ID + "/matches"
         headers = {"X-Auth-Token": FOOTBALL_DATA_KEY}
         params = {"dateFrom": today, "dateTo": tomorrow, "status": "SCHEDULED"}
 
         resp = requests.get(url, headers=headers, params=params, timeout=15)
         if resp.status_code in (403, 429):
+            logger.warning("Football-data.org: " + str(resp.status_code))
             return []
 
         resp.raise_for_status()
@@ -115,11 +117,11 @@ def get_ucl_projections():
                 "home_goals": home_goals,
                 "away_goals": away_goals,
                 "total": round(home_goals + away_goals, 1),
-                "league": "Champions League",
+                "league": "EPL",
                 "commence_time": commence,
             })
 
-        logger.info("UCL projections: " + str(len(projections)) + " matches")
+        logger.info("EPL projections: " + str(len(projections)) + " matches")
 
         # --- GLOBAL CLV ---
         from engine.global_clv_helper import attach_clv_to_list
@@ -136,8 +138,9 @@ def get_ucl_projections():
         return projections
 
     except Exception as e:
-        logger.error("UCL projections failed: " + str(e))
+        logger.error("EPL projections failed: " + str(e))
         return []
+
  
 
  
