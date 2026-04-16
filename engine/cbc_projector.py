@@ -2,87 +2,27 @@ import requests
 import logging
 from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
- 
+
 logger = logging.getLogger(__name__)
- 
+
 FOOTBALL_DATA_API = "https://api.football-data.org/v4"
 FOOTBALL_DATA_KEY = __import__('os').getenv("FOOTBALL_DATA_KEY", "")
- 
+
 EPL_ID = "PL"
 UCL_ID = "CL"
- 
+
 LEAGUE_AVG_GOALS = 2.6
 LEAGUE_AVG_KBO_RUNS = 5.2
 LEAGUE_AVG_NPB_RUNS = 4.1
- 
+
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
- 
- 
+
+
 # ─────────────────────────────────────────────
 # EPL / UCL
 # ─────────────────────────────────────────────
- 
-def get_ucl_projections():
-    try:
-        if not FOOTBALL_DATA_KEY:
-            return []
 
-        today = datetime.now().strftime("%Y-%m-%d")
-        tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
-
-        url = FOOTBALL_DATA_API + "/competitions/" + UCL_ID + "/matches"
-        headers = {"X-Auth-Token": FOOTBALL_DATA_KEY}
-        params = {"dateFrom": today, "dateTo": tomorrow, "status": "SCHEDULED"}
-
-        resp = requests.get(url, headers=headers, params=params, timeout=15)
-        if resp.status_code in (403, 429):
-            return []
-
-        resp.raise_for_status()
-        data = resp.json()
-
-        projections = []
-        for match in data.get("matches", []):
-            home = match.get("homeTeam", {}).get("shortName", "") or match.get("homeTeam", {}).get("name", "")
-            away = match.get("awayTeam", {}).get("shortName", "") or match.get("awayTeam", {}).get("name", "")
-            commence = match.get("utcDate", "")
-
-            home_goals, away_goals = _project_soccer_score(home, away)
-
-            projections.append({
-                "home_team": home,
-                "away_team": away,
-                "home_goals": home_goals,
-                "away_goals": away_goals,
-                "total": round(home_goals + away_goals, 1),
-                "league": "Champions League",
-                "commence_time": commence,
-            })
-
-        logger.info("UCL projections: " + str(len(projections)) + " matches")
-
-        # --- GLOBAL CLV ---
-        from engine.global_clv_helper import attach_clv_to_list
-        projections = attach_clv_to_list(projections)
-
-        # --- GLOBAL VALIDATION ---
-        from engine.global_validator import validate_global_list
-        projections = validate_global_list(projections)
-
-        # --- GLOBAL SCHEMA ENFORCER ---
-        from engine.global_schema_enforcer import enforce_schema_list
-        projections = enforce_schema_list(projections)
-
-        return projections
-
-    except Exception as e:
-        logger.error("UCL projections failed: " + str(e))
-        return []
-
-
-
- 
- def get_epl_projections():
+def get_epl_projections():
     try:
         if not FOOTBALL_DATA_KEY:
             logger.warning("FOOTBALL_DATA_KEY not set")
@@ -141,20 +81,75 @@ def get_ucl_projections():
         logger.error("EPL projections failed: " + str(e))
         return []
 
- 
 
- 
- 
+def get_ucl_projections():
+    try:
+        if not FOOTBALL_DATA_KEY:
+            return []
+
+        today = datetime.now().strftime("%Y-%m-%d")
+        tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+
+        url = FOOTBALL_DATA_API + "/competitions/" + UCL_ID + "/matches"
+        headers = {"X-Auth-Token": FOOTBALL_DATA_KEY}
+        params = {"dateFrom": today, "dateTo": tomorrow, "status": "SCHEDULED"}
+
+        resp = requests.get(url, headers=headers, params=params, timeout=15)
+        if resp.status_code in (403, 429):
+            return []
+
+        resp.raise_for_status()
+        data = resp.json()
+
+        projections = []
+        for match in data.get("matches", []):
+            home = match.get("homeTeam", {}).get("shortName", "") or match.get("homeTeam", {}).get("name", "")
+            away = match.get("awayTeam", {}).get("shortName", "") or match.get("awayTeam", {}).get("name", "")
+            commence = match.get("utcDate", "")
+
+            home_goals, away_goals = _project_soccer_score(home, away)
+
+            projections.append({
+                "home_team": home,
+                "away_team": away,
+                "home_goals": home_goals,
+                "away_goals": away_goals,
+                "total": round(home_goals + away_goals, 1),
+                "league": "Champions League",
+                "commence_time": commence,
+            })
+
+        logger.info("UCL projections: " + str(len(projections)) + " matches")
+
+        # --- GLOBAL CLV ---
+        from engine.global_clv_helper import attach_clv_to_list
+        projections = attach_clv_to_list(projections)
+
+        # --- GLOBAL VALIDATION ---
+        from engine.global_validator import validate_global_list
+        projections = validate_global_list(projections)
+
+        # --- GLOBAL SCHEMA ENFORCER ---
+        from engine.global_schema_enforcer import enforce_schema_list
+        projections = enforce_schema_list(projections)
+
+        return projections
+
+    except Exception as e:
+        logger.error("UCL projections failed: " + str(e))
+        return []
+
+
 def _project_soccer_score(home_team, away_team):
     home_goals = round(LEAGUE_AVG_GOALS * 0.55 * 1.10, 1)
     away_goals = round(LEAGUE_AVG_GOALS * 0.45 * 0.92, 1)
     return home_goals, away_goals
- 
- 
+
+
 # ─────────────────────────────────────────────
 # KBO — scrape MyKBOStats
 # ─────────────────────────────────────────────
- 
+
 def get_kbo_projections():
     try:
         today_kst = (datetime.now() + timedelta(hours=14)).strftime("%Y-%m-%d")
@@ -167,8 +162,8 @@ def get_kbo_projections():
     except Exception as e:
         logger.error("KBO projections failed: " + str(e))
         return []
- 
- 
+
+
 def _scrape_kbo():
     """Scrape today's KBO games from MyKBOStats."""
     try:
@@ -176,7 +171,7 @@ def _scrape_kbo():
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
         projections = []
- 
+
         # MyKBOStats shows today's matchups in game cards
         # Try multiple selectors to be resilient to HTML changes
         game_blocks = (
@@ -185,7 +180,7 @@ def _scrape_kbo():
             soup.select("[class*='game']") or
             soup.select("table tr")
         )
- 
+
         for block in game_blocks:
             teams = block.select("[class*='team']")
             team_names = [t.get_text(strip=True) for t in teams if t.get_text(strip=True)]
@@ -201,7 +196,7 @@ def _scrape_kbo():
                     "total": round(home_runs + away_runs, 1),
                     "league": "KBO",
                 })
- 
+
         # Deduplicate by home+away pair
         seen = set()
         unique = []
@@ -210,19 +205,19 @@ def _scrape_kbo():
             if key not in seen:
                 seen.add(key)
                 unique.append(p)
- 
+
         if unique:
             logger.info(f"KBO MyKBOStats scrape: {len(unique)} games")
             return unique
- 
+
     except Exception as e:
         logger.warning(f"KBO MyKBOStats scrape failed: {e}")
- 
+
     # Fallback: TheSportsDB
     logger.warning("KBO falling back to TheSportsDB")
     return _kbo_tsdb_fallback()
- 
- 
+
+
 def _kbo_tsdb_fallback():
     """TheSportsDB fallback — may only return 1 game."""
     try:
@@ -252,12 +247,12 @@ def _kbo_tsdb_fallback():
     except Exception as e:
         logger.error(f"KBO TheSportsDB fallback failed: {e}")
         return []
- 
- 
+
+
 # ─────────────────────────────────────────────
 # NPB — scrape npb.jp official site
 # ─────────────────────────────────────────────
- 
+
 def get_npb_projections():
     try:
         today_jst = (datetime.now() + timedelta(hours=14)).strftime("%Y-%m-%d")
@@ -270,8 +265,8 @@ def get_npb_projections():
     except Exception as e:
         logger.error("NPB projections failed: " + str(e))
         return []
- 
- 
+
+
 def _scrape_npb():
     """Scrape today's NPB games from npb.jp official English site."""
     try:
@@ -279,7 +274,7 @@ def _scrape_npb():
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
         projections = []
- 
+
         # npb.jp uses tables for game listings
         # Each row has away team, score/time, home team
         rows = soup.select("table tr")
@@ -302,7 +297,7 @@ def _scrape_npb():
                         "total": round(home_runs + away_runs, 1),
                         "league": "NPB",
                     })
- 
+
         # Deduplicate
         seen = set()
         unique = []
@@ -311,19 +306,19 @@ def _scrape_npb():
             if key not in seen:
                 seen.add(key)
                 unique.append(p)
- 
+
         if unique:
             logger.info(f"NPB npb.jp scrape: {len(unique)} games")
             return unique
- 
+
     except Exception as e:
         logger.warning(f"NPB npb.jp scrape failed: {e}")
- 
+
     # Fallback: TheSportsDB
     logger.warning("NPB falling back to TheSportsDB")
     return _npb_tsdb_fallback()
- 
- 
+
+
 def _npb_tsdb_fallback():
     """TheSportsDB fallback for NPB."""
     try:
@@ -344,7 +339,8 @@ def _npb_tsdb_fallback():
             away_runs = round(LEAGUE_AVG_NPB_RUNS * 0.98, 1)
             projections.append({
                 "home_team": home, "away_team": away,
-                "home_runs": home_runs, "away_runs": away_runs,
+                "home_runs": home_runs,
+                "away_runs": away_runs,
                 "total": round(home_runs + away_runs, 1),
                 "league": "NPB",
             })
@@ -353,12 +349,12 @@ def _npb_tsdb_fallback():
     except Exception as e:
         logger.error(f"NPB TheSportsDB fallback failed: {e}")
         return []
- 
- 
+
+
 # ─────────────────────────────────────────────
 # Format posts
 # ─────────────────────────────────────────────
- 
+
 def format_epl_projection_post(projections):
     if not projections:
         return ""
@@ -383,8 +379,8 @@ def format_epl_projection_post(projections):
         "#CashBeforeCoffee #EPL #SoccerAnalytics",
     ]
     return "\n".join(lines)
- 
- 
+
+
 def format_ucl_projection_post(projections):
     if not projections:
         return ""
@@ -408,8 +404,8 @@ def format_ucl_projection_post(projections):
         "#CashBeforeCoffee #UCL #ChampionsLeague",
     ]
     return "\n".join(lines)
- 
- 
+
+
 def format_kbo_projection_post(projections):
     if not projections:
         return ""
@@ -434,8 +430,8 @@ def format_kbo_projection_post(projections):
         "#CashBeforeCoffee #KBO #KoreanBaseball",
     ]
     return "\n".join(lines)
- 
- 
+
+
 def format_npb_projection_post(projections):
     if not projections:
         return ""
@@ -457,8 +453,7 @@ def format_npb_projection_post(projections):
 
     return "\n".join(lines)
 
- 
- 
+
 def format_cbc_results_post(results):
     date_str = datetime.now().strftime("%B %d")
     lines = [
@@ -480,7 +475,7 @@ def format_cbc_results_post(results):
         home = r.get("home_team", "")
         away = r.get("away_team", "")
         proj_home = r.get("home_proj", 0)
-        proj_away = r.get("away_proj", 0)
+        proj_away = r.get("home_proj", 0)
         actual_home = r.get("actual_home", "?")
         actual_away = r.get("actual_away", "?")
         symbol = "✅" if r.get("accurate") else "❌"
