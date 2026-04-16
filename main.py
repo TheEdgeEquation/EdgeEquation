@@ -450,3 +450,269 @@ def run_monthly(dry_run, no_graphic):
         logger.info("[DRY RUN] Monthly:\n" + caption)
 
     ]
+    # ============================================================
+# EDGE EQUATION 3.0 — US SIGNAL MODES
+# ============================================================
+
+def run_model_notes(dry_run, no_graphic):
+    logger.info("MODE: model_notes")
+
+    weekly = build_weekly_stats(style="ee")
+    all_time = build_all_time_stats(style="ee")
+
+    caption = "\n".join([
+        "EDGE EQUATION 3.0 — MODEL NOTES",
+        "",
+        f"Weekly volume: {weekly.get('total', 0)} graded outputs",
+        f"All-time volume: {all_time.get('total', 0)} graded outputs",
+        "",
+        "Model continues to scan:",
+        "• Scoring environments",
+        "• Pace and shot volume",
+        "• Volatility and late-game drift",
+        "",
+        "Always learning. Always refining.",
+        "#EdgeEquation",
+    ])
+
+    logger.info("[DRY RUN] Model Notes:\n" + caption)
+
+
+def run_primary_signal(dry_run, no_graphic):
+    logger.info("MODE: primary_signal")
+    try:
+        plays = _sort_by_edge(_load_all_today_plays())
+        plays = [p for p in plays if not game_has_started(p)]
+
+        game_plays = _filter_games(plays)
+        top_game = game_plays[0] if game_plays else None
+
+        if not top_game:
+            logger.info("No game-level edges for Primary Signal")
+            return
+
+        text = generate_gotd_from_play(top_game)
+        caption = "EDGE EQUATION 3.0 — PRIMARY SIGNAL\n\n" + text
+
+        logger.info("[DRY RUN] Primary Signal:\n" + caption)
+
+    except Exception as e:
+        logger.error("Primary Signal failed: " + str(e))
+
+
+def run_prop_efficiency_signal(dry_run, no_graphic):
+    logger.info("MODE: prop_efficiency_signal")
+    try:
+        plays = _sort_by_edge(_load_all_today_plays())
+        plays = [p for p in plays if not game_has_started(p)]
+
+        prop_plays = _filter_props(plays)
+        top_prop = prop_plays[0] if prop_plays else None
+
+        if not top_prop:
+            logger.info("No prop edges for Prop Efficiency Signal")
+            return
+
+        text = generate_potd_from_play(top_prop)
+        caption = "EDGE EQUATION 3.0 — PROP EFFICIENCY SIGNAL\n\n" + text
+
+        logger.info("[DRY RUN] Prop Efficiency Signal:\n" + caption)
+
+    except Exception as e:
+        logger.error("Prop Efficiency Signal failed: " + str(e))
+
+
+def run_run_suppression_signal(dry_run, no_graphic):
+    logger.info("MODE: run_suppression_signal")
+    try:
+        plays = _sort_by_edge(_load_all_today_plays())
+        plays = [p for p in plays if not game_has_started(p)]
+
+        nrfi_plays = _filter_nrfi(plays)
+        top_nrfi = nrfi_plays[0] if nrfi_plays else None
+
+        if not top_nrfi:
+            logger.info("No NRFI/YRFI edges for Run Suppression Signal")
+            return
+
+        text = generate_first_inning_from_play(top_nrfi)
+        caption = "EDGE EQUATION 3.0 — RUN SUPPRESSION SIGNAL\n\n" + text
+
+        logger.info("[DRY RUN] Run Suppression Signal:\n" + caption)
+
+    except Exception as e:
+        logger.error("Run Suppression Signal failed: " + str(e))
+
+
+def run_high_confidence_outlier(dry_run, no_graphic):
+    logger.info("MODE: high_confidence_outlier")
+    try:
+        plays = _sort_by_edge(_load_all_today_plays())
+        plays = [p for p in plays if not game_has_started(p)]
+
+        top_play = plays[0]
+
+        if top_play.get("prop_label") in ("K", "SOG", "3PM", "PTS", "AST", "REB"):
+            text = generate_potd_from_play(top_play)
+        else:
+            text = generate_gotd_from_play(top_play)
+
+        caption = "EDGE EQUATION 3.0 — HIGH-CONFIDENCE OUTLIER\n\n" + text
+
+        logger.info("[DRY RUN] High-Confidence Outlier:\n" + caption)
+
+    except Exception as e:
+        logger.error("High-Confidence Outlier failed: " + str(e))
+
+
+def run_secondary_alignment(dry_run, no_graphic):
+    logger.info("MODE: secondary_alignment")
+    try:
+        plays = _sort_by_edge(_load_all_today_plays())
+        plays = [p for p in plays if not game_has_started(p)]
+
+        if len(plays) < 2:
+            logger.info("Not enough plays for Secondary Alignment")
+            return
+
+        second = plays[1]
+
+        if second.get("prop_label") in ("K", "SOG", "3PM", "PTS", "AST", "REB"):
+            text = generate_potd_from_play(second)
+        else:
+            text = generate_gotd_from_play(second)
+
+        caption = "EDGE EQUATION 3.0 — SECONDARY ALIGNMENT\n\n" + text
+
+        logger.info("[DRY RUN] Secondary Alignment:\n" + caption)
+
+    except Exception as e:
+        logger.error("Secondary Alignment failed: " + str(e))
+
+
+# ============================================================
+# EDGE EQUATION 3.0 — GLOBAL (OVERNIGHT) SIGNAL MODES
+# ============================================================
+
+def _load_global_games():
+    kbo = get_kbo_projections()
+    npb = get_npb_projections()
+    epl = get_epl_projections()
+    ucl = get_ucl_projections()
+    return kbo + npb + epl + ucl
+
+
+def _filter_started_global(games):
+    safe = []
+    for g in games:
+        if game_has_started(g):
+            logger.info(f"Skipping {g.get('matchup')} — already started or final")
+        else:
+            safe.append(g)
+    return safe
+
+
+def _validate_global(g):
+    if not g.get("vegas_total"):
+        return False
+    if g.get("model_total") == g.get("vegas_total"):
+        return False
+    return True
+
+
+def run_global_primary_signal(dry_run, no_graphic):
+    logger.info("MODE: global_primary_signal")
+
+    games = _filter_started_global(_load_global_games())
+    games = [g for g in games if _validate_global(g)]
+
+    if not games:
+        logger.info("No global games available")
+        return
+
+    games.sort(key=lambda x: -abs(x.get("model_total", 0) - x.get("vegas_total", 0)))
+    top = games[0]
+
+    text = generate_gotd_from_play(top)
+    caption = "EDGE EQUATION 3.0 — GLOBAL PRIMARY SIGNAL\n\n" + text
+
+    logger.info("[DRY RUN] Global Primary Signal:\n" + caption)
+
+
+def run_global_prop_efficiency_signal(dry_run, no_graphic):
+    logger.info("MODE: global_prop_efficiency_signal")
+
+    plays = _sort_by_edge(_load_all_today_plays())
+    plays = [p for p in plays if not game_has_started(p)]
+
+    props = _filter_props(plays)
+
+    if not props:
+        logger.info("No global props available")
+        return
+
+    top = props[0]
+    text = generate_potd_from_play(top)
+    caption = "EDGE EQUATION 3.0 — GLOBAL PROP EFFICIENCY SIGNAL\n\n" + text
+
+    logger.info("[DRY RUN] Global Prop Efficiency Signal:\n" + caption)
+
+
+def run_global_run_suppression_signal(dry_run, no_graphic):
+    logger.info("MODE: global_run_suppression_signal")
+
+    plays = _sort_by_edge(_load_all_today_plays())
+    plays = [p for p in plays if not game_has_started(p)]
+
+    nrfi = _filter_nrfi(plays)
+
+    if not nrfi:
+        logger.info("No global NRFI/YRFI plays")
+        return
+
+    top = nrfi[0]
+    text = generate_first_inning_from_play(top)
+    caption = "EDGE EQUATION 3.0 — GLOBAL RUN SUPPRESSION SIGNAL\n\n" + text
+
+    logger.info("[DRY RUN] Global Run Suppression Signal:\n" + caption)
+
+
+def run_global_high_confidence_outlier(dry_run, no_graphic):
+    logger.info("MODE: global_high_confidence_outlier")
+
+    plays = _sort_by_edge(_load_all_today_plays())
+    plays = [p for p in plays if not game_has_started(p)]
+
+    top = plays[0]
+
+    if top.get("prop_label") in ("K", "SOG", "3PM", "PTS", "AST", "REB"):
+        text = generate_potd_from_play(top)
+    else:
+        text = generate_gotd_from_play(top)
+
+    caption = "EDGE EQUATION 3.0 — GLOBAL HIGH-CONFIDENCE OUTLIER\n\n" + text
+
+    logger.info("[DRY RUN] Global High-Confidence Outlier:\n" + caption)
+
+
+def run_global_secondary_alignment(dry_run, no_graphic):
+    logger.info("MODE: global_secondary_alignment")
+
+    plays = _sort_by_edge(_load_all_today_plays())
+    plays = [p for p in plays if not game_has_started(p)]
+
+    if len(plays) < 2:
+        logger.info("Not enough global plays")
+        return
+
+    second = plays[1]
+
+    if second.get("prop_label") in ("K", "SOG", "3PM", "PTS", "AST", "REB"):
+        text = generate_potd_from_play(second)
+    else:
+        text = generate_gotd_from_play(second)
+
+    caption = "EDGE EQUATION 3.0 — GLOBAL SECONDARY ALIGNMENT\n\n" + text
+
+    logger.info("[DRY RUN] Global Secondary Alignment:\n" + caption)
+
