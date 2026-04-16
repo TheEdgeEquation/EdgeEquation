@@ -950,7 +950,3 @@ def main():
     logger.info("Run complete.")
 
 
-if __name__ == "__main__":
-    main()
-
-
