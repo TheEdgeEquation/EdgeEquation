@@ -9,6 +9,7 @@ from typing import List, Dict, Optional, Tuple
 
 import requests
 
+
 # ==========================
 # CONFIG & CONSTANTS
 # ==========================
@@ -19,30 +20,37 @@ USER_AGENT = (
     "Chrome/123.0.0.0 Safari/537.36"
 )
 
-HEADERS = {"User-Agent": USER_AGENT, "Accept": "application/json, text/html"}
+HEADERS = {
+    "User-Agent": USER_AGENT,
+    "Accept": "application/json, text/html",
+}
 
-# TODO: Fill these with your canonical validator names
-KBO_TEAM_MAP = {
+# Fill these with your canonical validator names
+KBO_TEAM_MAP: Dict[str, str] = {
     # "Official Name": "EdgeEquation Name",
     # "KT Wiz": "KT Wiz",
 }
 
-NPB_TEAM_MAP = {
+NPB_TEAM_MAP: Dict[str, str] = {
     # "Official Name": "EdgeEquation Name",
     # "Yokohama DeNA BayStars": "Yokohama DeNA",
 }
 
-PINNACLE_TEAM_MAP = {
+PINNACLE_TEAM_MAP: Dict[str, str] = {
     # "Pinnacle Name": "EdgeEquation Name",
     # "KT Wiz": "KT Wiz",
 }
 
-# TODO: Replace with real endpoints
+# Replace these with real URLs/endpoints
 KBO_OFFICIAL_URL_TEMPLATE = "https://example.kbo.or.kr/schedule?date={date}"
 NPB_OFFICIAL_URL_TEMPLATE = "https://example.yahoo.jp/npb/schedule?date={date}"
 
-PINNACLE_API_URL_TEMPLATE = "https://example.pinnacle.com/api/baseball/{league}/odds?date={date}"
-PINNACLE_WEB_JSON_URL_TEMPLATE = "https://example.pinnacle.com/web/json/baseball/{league}?date={date}"
+PINNACLE_API_URL_TEMPLATE = (
+    "https://example.pinnacle.com/api/baseball/{league}/odds?date={date}"
+)
+PINNACLE_WEB_JSON_URL_TEMPLATE = (
+    "https://example.pinnacle.com/web/json/baseball/{league}?date={date}"
+)
 
 
 # ==========================
@@ -55,7 +63,7 @@ class GameSchedule:
     date: dt.date
     home_team: str
     away_team: str
-    start_time: Optional[dt.datetime]  # UTC or local; you decide
+    start_time: Optional[dt.datetime]  # you decide timezone convention
     status: str  # "scheduled", "postponed", etc.
 
 
@@ -126,7 +134,12 @@ def _normalize_pinnacle_team(name: str) -> str:
     return PINNACLE_TEAM_MAP.get(name, name)
 
 
-def _game_key(league: str, home: str, away: str, date: dt.date) -> Tuple[str, str, str, dt.date]:
+def _game_key(
+    league: str,
+    home: str,
+    away: str,
+    date: dt.date,
+) -> Tuple[str, str, str, dt.date]:
     return (league.lower(), home.lower(), away.lower(), date)
 
 
@@ -134,7 +147,17 @@ def _game_key(league: str, home: str, away: str, date: dt.date) -> Tuple[str, st
 # OFFICIAL SCHEDULE SCRAPERS
 # ==========================
 
-def fetch_kbo_official_schedule(target_date: dt.date, debug: bool = False) -> List[GameSchedule]:
+def fetch_kbo_official_schedule(
+    target_date: dt.date,
+    debug: bool = False,
+) -> List[GameSchedule]:
+    """
+    Scrape official KBO schedule for target_date.
+
+    TODO:
+      - Replace URL with real KBO schedule endpoint
+      - Parse HTML/JSON and build GameSchedule objects
+    """
     url = KBO_OFFICIAL_URL_TEMPLATE.format(date=target_date.strftime("%Y%m%d"))
     _debug_print(debug, f"[KBO OFFICIAL] GET {url}")
     try:
@@ -145,15 +168,24 @@ def fetch_kbo_official_schedule(target_date: dt.date, debug: bool = False) -> Li
         return []
 
     html = resp.text
-    # TODO: parse HTML and extract games
-    # This is a stub; replace with real parsing logic.
+    # TODO: parse html into games
     games: List[GameSchedule] = []
 
     _debug_print(debug, f"[KBO OFFICIAL] Parsed games: {len(games)}")
     return games
 
 
-def fetch_npb_official_schedule(target_date: dt.date, debug: bool = False) -> List[GameSchedule]:
+def fetch_npb_official_schedule(
+    target_date: dt.date,
+    debug: bool = False,
+) -> List[GameSchedule]:
+    """
+    Scrape official NPB schedule (e.g., Yahoo Japan JSON) for target_date.
+
+    TODO:
+      - Replace URL with real NPB/Yahoo JSON endpoint
+      - Parse JSON and build GameSchedule objects
+    """
     url = NPB_OFFICIAL_URL_TEMPLATE.format(date=target_date.strftime("%Y%m%d"))
     _debug_print(debug, f"[NPB OFFICIAL] GET {url}")
     try:
@@ -163,9 +195,11 @@ def fetch_npb_official_schedule(target_date: dt.date, debug: bool = False) -> Li
         _debug_print(debug, f"[NPB OFFICIAL] Error: {e}")
         return []
 
-    # TODO: parse JSON from Yahoo Japan (or similar)
-    # This is a stub; replace with real parsing logic.
-    data = resp.json()
+    # TODO: parse JSON
+    # Example:
+    # data = resp.json()
+    # for game in data["games"]:
+    #     ...
     games: List[GameSchedule] = []
 
     _debug_print(debug, f"[NPB OFFICIAL] Parsed games: {len(games)}")
@@ -176,7 +210,18 @@ def fetch_npb_official_schedule(target_date: dt.date, debug: bool = False) -> Li
 # PINNACLE API SCRAPER
 # ==========================
 
-def fetch_pinnacle_api_odds(league: str, target_date: dt.date, debug: bool = False) -> Dict[Tuple[str, str, str, dt.date], GameOdds]:
+def fetch_pinnacle_api_odds(
+    league: str,
+    target_date: dt.date,
+    debug: bool = False,
+) -> Dict[Tuple[str, str, str, dt.date], GameOdds]:
+    """
+    Fetch baseline odds from Pinnacle API.
+
+    TODO:
+      - Replace URL with real Pinnacle API endpoint
+      - Parse JSON into GameOdds
+    """
     url = PINNACLE_API_URL_TEMPLATE.format(
         league=league.lower(),
         date=target_date.strftime("%Y-%m-%d"),
@@ -189,11 +234,11 @@ def fetch_pinnacle_api_odds(league: str, target_date: dt.date, debug: bool = Fal
         _debug_print(debug, f"[PINNACLE API {league.upper()}] Error: {e}")
         return {}
 
-    # TODO: parse Pinnacle API JSON
-    data = resp.json()
+    # TODO: parse JSON
+    # data = resp.json()
     odds_map: Dict[Tuple[str, str, str, dt.date], GameOdds] = {}
 
-    # Example stub structure:
+    # Example structure:
     # for event in data.get("events", []):
     #     home = _normalize_pinnacle_team(event["home"])
     #     away = _normalize_pinnacle_team(event["away"])
@@ -223,7 +268,18 @@ def fetch_pinnacle_api_odds(league: str, target_date: dt.date, debug: bool = Fal
 # PINNACLE WEB JSON SCRAPER
 # ==========================
 
-def fetch_pinnacle_web_odds(league: str, target_date: dt.date, debug: bool = False) -> Dict[Tuple[str, str, str, dt.date], GameOdds]:
+def fetch_pinnacle_web_odds(
+    league: str,
+    target_date: dt.date,
+    debug: bool = False,
+) -> Dict[Tuple[str, str, str, dt.date], GameOdds]:
+    """
+    Fetch real-time odds from Pinnacle's hidden JSON endpoints.
+
+    TODO:
+      - Replace URL with real web JSON endpoint (from Network tab)
+      - Parse JSON into GameOdds
+    """
     url = PINNACLE_WEB_JSON_URL_TEMPLATE.format(
         league=league.lower(),
         date=target_date.strftime("%Y-%m-%d"),
@@ -236,11 +292,11 @@ def fetch_pinnacle_web_odds(league: str, target_date: dt.date, debug: bool = Fal
         _debug_print(debug, f"[PINNACLE WEB {league.upper()}] Error: {e}")
         return {}
 
-    # TODO: parse hidden JSON used by Pinnacle frontend
-    data = resp.json()
+    # TODO: parse JSON
+    # data = resp.json()
     odds_map: Dict[Tuple[str, str, str, dt.date], GameOdds] = {}
 
-    # Example stub structure:
+    # Example structure:
     # for event in data.get("events", []):
     #     home = _normalize_pinnacle_team(event["home"])
     #     away = _normalize_pinnacle_team(event["away"])
@@ -357,7 +413,6 @@ def get_projections(
         debug=debug,
     )
 
-    # Return as list of dicts for easy JSON/serialization
     return [asdict(g) for g in merged]
 
 
@@ -382,12 +437,15 @@ def run_diagnostic(target_date: dt.date, debug: bool = False) -> None:
         print(f"Games found: {len(schedule)}")
         if schedule:
             sample = schedule[0]
-            print("Sample:", {
-                "home": sample.home_team,
-                "away": sample.away_team,
-                "start_time": sample.start_time,
-                "status": sample.status,
-            })
+            print(
+                "Sample:",
+                {
+                    "home": sample.home_team,
+                    "away": sample.away_team,
+                    "start_time": sample.start_time,
+                    "status": sample.status,
+                },
+            )
         else:
             print("Sample: []")
         print()
@@ -421,7 +479,9 @@ def run_diagnostic(target_date: dt.date, debug: bool = False) -> None:
 
 
 def _cli():
-    parser = argparse.ArgumentParser(description="Overseas Engine (KBO/NPB) – Official + Pinnacle")
+    parser = argparse.ArgumentParser(
+        description="Overseas Engine (KBO/NPB) – Official + Pinnacle"
+    )
     parser.add_argument(
         "--date",
         type=str,
@@ -446,14 +506,17 @@ def _cli():
     if args.league == "both":
         run_diagnostic(target_date, debug=args.debug)
     else:
-        # Single-league diagnostic using get_projections
         print("==============================================")
         print(f"OVERSEAS ENGINE DIAGNOSTIC – {args.league.upper()}")
         print("==============================================")
         print(f"Date: {target_date.isoformat()}")
         print()
 
-        projections = get_projections(args.league, target_date=target_date, debug=args.debug)
+        projections = get_projections(
+            args.league,
+            target_date=target_date,
+            debug=args.debug,
+        )
         print(f"Games built: {len(projections)}")
         if projections:
             print("Sample:", projections[0])
