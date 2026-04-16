@@ -50,17 +50,19 @@ def get_epl_projections():
                 "total": round(home_goals + away_goals, 1),
                 "league": "EPL", "commence_time": commence,
             })
-        logger.info("EPL projections: " + str(len(projections)) + " matches")
-        return projections
-    except Exception as e:
-        logger.error("EPL projections failed: " + str(e))
-        from engine.global_clv_helper import attach_clv_to_list
-return attach_clv_to_list(games)
+       logger.info("EPL projections: " + str(len(projections)) + " matches")
+
+from engine.global_clv_helper import attach_clv_to_list
+projections = attach_clv_to_list(projections)
+
 from engine.global_validator import validate_global_list
-games = validate_global_list(games)
+projections = validate_global_list(projections)
 
+from engine.global_schema_enforcer import enforce_schema_list
+projections = enforce_schema_list(projections)
 
-return games
+return projections
+
 
  
  
@@ -91,17 +93,18 @@ def get_ucl_projections():
                 "league": "Champions League", "commence_time": commence,
             })
         logger.info("UCL projections: " + str(len(projections)) + " matches")
-        return projections
-    except Exception as e:
-        logger.error("UCL projections failed: " + str(e))
-        def get_ucl_projections():
-    ...
-    from engine.global_clv_helper import attach_clv_to_list
-    return attach_clv_to_list(games)
- from engine.global_validator import validate_global_list
-games = validate_global_list(games)
 
-return games
+from engine.global_clv_helper import attach_clv_to_list
+projections = attach_clv_to_list(projections)
+
+from engine.global_validator import validate_global_list
+projections = validate_global_list(projections)
+
+from engine.global_schema_enforcer import enforce_schema_list
+projections = enforce_schema_list(projections)
+
+return projections
+
 
  
  
