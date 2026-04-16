@@ -109,4 +109,8 @@ def get_npb_projections(game_date: date = None):
     logger.info("NPB: " + str(len(games)) + " games found for " + str(gd))
     from engine.global_clv_helper import attach_clv_to_list
 return attach_clv_to_list(games)
+from engine.global_validator import validate_global_list
+games = validate_global_list(games)
+
+return games
 
