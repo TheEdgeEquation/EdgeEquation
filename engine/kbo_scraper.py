@@ -108,7 +108,7 @@ def _project_kbo_score(home_team, away_team):
     away = round(LEAGUE_AVG_KBO_RUNS * 0.97, 1)
     return home, away
  
-  def get_kbo_projections(game_date: date = None):
+def get_kbo_projections(game_date: date = None):
     """
     Public KBO entrypoint — uses official schedule + ESPN fallback,
     then runs through the global pipeline.
@@ -139,5 +139,6 @@ def _project_kbo_score(home_team, away_team):
     except Exception as e:
         logger.error("KBO projections failed: " + str(e))
         return []
+
 
 
