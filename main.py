@@ -251,7 +251,8 @@ def run_potd(dry_run, no_graphic):
     else:
         logger.info("[DRY RUN] GOTD:\n" + post_text)
 except Exception as e:
-    logger.error("GOTD failed: " + str(e))
+    logger.error("comp failed: " + str(e))
+
 
 
         if not all_plays:
