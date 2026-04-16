@@ -167,6 +167,19 @@ def calculate_nrfi_plays(style="ee"):
                     logger.error("NRFI calc failed: " + str(e))
                     continue
         logger.info("NRFI/YRFI: " + str(len(nrfi_plays)) + " plays found")
+     # --- Sort and filter NRFI/YRFI plays for output ---
+# Sort by edge descending
+nrfi_plays = sorted(nrfi_plays, key=lambda x: x.get("edge", 0), reverse=True)
+
+# Keep only the top 3 plays
+nrfi_plays = nrfi_plays[:3]
+
+# Ensure deterministic ordering (NRFI first, then YRFI)
+nrfi_plays = sorted(
+    nrfi_plays,
+    key=lambda x: (0 if x.get("prop_label") == "NRFI" else 1, -x.get("edge", 0))
+)
+
         return nrfi_plays
     except Exception as e:
         logger.error("NRFI pipeline failed: " + str(e))
