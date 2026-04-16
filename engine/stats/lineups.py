@@ -2,8 +2,14 @@ import requests
 from datetime import datetime
 
 def get_today_batters(league):
-    if league != "MLB":
-        return []
+    if league == "MLB":
+        return get_today_batters_mlb()
+    if league == "KBO":
+        return get_today_batters_kbo()
+    if league == "NPB":
+        return get_today_batters_npb()
+    return []
+
 
     url = "https://statsapi.mlb.com/api/v1/schedule"
     params = {"sportId": 1, "hydrate": "probablePitcher,team,lineups", "date": datetime.now().strftime("%Y-%m-%d")}
@@ -35,3 +41,12 @@ def get_today_batters(league):
                         })
 
     return batters
+
+def get_today_batters_kbo():
+    # Simple stub — replace with real scraper later
+    return []
+
+def get_today_batters_npb():
+    # Simple stub — replace with real scraper later
+    return []
+
