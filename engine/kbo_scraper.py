@@ -134,4 +134,3 @@ def _project_kbo_score(home_team, away_team):
     except Exception as e:
         logger.error("KBO projections failed: " + str(e))
         return []
-
