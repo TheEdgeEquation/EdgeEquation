@@ -137,19 +137,26 @@ public_accuracy_text = (
 )
 
 
+internal_acc, public_acc = compute_full_accuracy()
+
 engine_accuracy_text = (
     f"MLB Games: {internal_acc['mlb_games'][0]}-{internal_acc['mlb_games'][1]}\n"
-    f"Pitchers: {internal_acc['pitchers'][0]}-{internal_acc['pitchers'][1]}\n"
+    f"Pitchers (K Props): {internal_acc['pitchers'][0]}-{internal_acc['pitchers'][1]}\n"
     f"NRFI/YRFI: {internal_acc['nrfi'][0]}-{internal_acc['nrfi'][1]}\n"
     f"Global: {internal_acc['global']}\n"
 )
 
 public_accuracy_text = (
-    f"MLB Games: {public_acc['mlb_games'][0]}-{public_acc['mlb_games'][1]}\n"
-    f"Pitchers: {public_acc['pitchers'][0]}-{public_acc['pitchers'][1]}\n"
-    f"NRFI/YRFI: {public_acc['nrfi'][0]}-{public_acc['nrfi'][1]}\n"
-    f"Global: {public_acc['global']}\n"
+    f"GOTD: {public_acc['GOTD'][0]}-{public_acc['GOTD'][1]}\n"
+    f"POTD: {public_acc['POTD'][0]}-{public_acc['POTD'][1]}\n"
+    f"First Inning POTD: {public_acc['FIRST_INNING_POTD'][0]}-{public_acc['FIRST_INNING_POTD'][1]}\n"
+    f"NRFI/YRFI: {public_acc['NRFI'][0]}-{public_acc['NRFI'][1]}\n"
+    f"HR Props: {public_acc['HR'][0]}-{public_acc['HR'][1]}\n"
+    f"Smash: {public_acc['SMASH'][0]}-{public_acc['SMASH'][1]}\n"
+    f"Outlier: {public_acc['OUTLIER'][0]}-{public_acc['OUTLIIER'][1]}\n"
+    f"Sharp Signal: {public_acc['SHARP_SIGNAL'][0]}-{public_acc['SHARP_SIGNAL'][1]}\n"
 )
+
 
 
     try:
@@ -343,11 +350,12 @@ def run_first_inning_potd(dry_run, no_graphic):
         caption = "EDGE EQUATION — FIRST INNING POTD\n\n" + fi_text
 
         if not dry_run:
-            post_tweet(caption)
-            if not dry_run:
     post_tweet(caption)
-    tag_public_pick(top_nrfi)
+    tag_public_pick(top_nrfi, "FIRST_INNING_POTD")
     logger.info("First Inning POTD posted")
+else:
+    logger.info("[DRY RUN] First Inning POTD:\n" + caption)
+
 
             logger.info("First Inning POTD posted")
         else:
@@ -451,7 +459,7 @@ def run_potd(dry_run, no_graphic):
 
         if not dry_run:
             post_tweet(caption)
-            tag_public_pick(top_game)
+            tag_public_pick(top_prop, "POTD")
             logger.info("POTD posted")
         else:
             logger.info("[DRY RUN] POTD:\n" + caption)
