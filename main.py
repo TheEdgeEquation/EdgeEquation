@@ -148,22 +148,11 @@ def run_daily_email(dry_run, no_graphic):
         bankroll = get_bankroll_summary()
 
         if not dry_run:
-            from email_sender import send_projections_only_email
-
-
-            send_projections_only_email(
-                mlb_games=mlb_games,
-                mlb_pitchers=mlb_pitchers,
-                nba_games=nba_games,
-                nhl_games=nhl_games,
-                nrfi_plays=nrfi_plays,
-                personal_parlay=personal_parlay,
-                personal_pp=personal_pp,
-                bankroll_summary=bankroll,
-                all_time_stats=all_time,
-            )
-
-            logger.info("Daily email sent")
+            send_email(
+    subject="Edge Equation — Daily Graphic Prompt",
+    body="Your daily graphic prompt is ready."
+)
+logger.info("Daily email sent")
         else:
             logger.info("[DRY RUN] Daily email generated")
 
