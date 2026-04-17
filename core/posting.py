@@ -7,6 +7,24 @@ def _log(message: str):
     """Simple internal logger."""
     print(f"[POSTING] {message}")
 
+import time
+
+def _retry(func, max_attempts=3, delay=3):
+    """
+    Retry wrapper for transient X API errors (503, over capacity).
+    """
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return func()
+        except Exception as e:
+            if "503" in str(e) or "Over capacity" in str(e):
+                print(f"[POSTING] Retry {attempt}/{max_attempts} after 503 Over Capacity")
+                time.sleep(delay)
+            else:
+                raise
+    raise Exception("Max retries reached for posting")
+
+
 def post_text(text: str):
     """
     Unified text posting function.
