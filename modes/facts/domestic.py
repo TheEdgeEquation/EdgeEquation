@@ -1,6 +1,6 @@
 from core.posting import post_text
 from core.formatting import format_domestic_fact
-from engines.facts import _load_facts
+from modes.facts.facts import _load_facts
 from core.scheduler_state import get_index
 
 def run():
