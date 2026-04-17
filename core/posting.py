@@ -8,19 +8,22 @@ def _log(message: str):
     """Simple internal logger."""
     print(f"[POSTING] {message}")
 
-def _retry(func, max_attempts=6, base_delay=2, max_delay=20):
+def _retry(func, max_attempts=6, base_delay=2, max_delay=20, final_wait=15):
     """
     Maximum-resilience retry logic with:
     - Exponential backoff
     - Jitter (randomized delay)
-    - Targeted retry for transient X API failures
-    - Hard cap to prevent runaway retries
+    - Transient error detection
+    - Final fallback wait before failing
     """
+    last_error = None
+
     for attempt in range(1, max_attempts + 1):
         try:
             return func()
 
         except Exception as e:
+            last_error = e
             error_text = str(e)
 
             # Only retry on transient X failures
@@ -47,7 +50,11 @@ def _retry(func, max_attempts=6, base_delay=2, max_delay=20):
 
             time.sleep(sleep_time)
 
-    raise Exception("Max retries reached for posting")
+    # Final fallback wait before giving up
+    _log(f"Final wait {final_wait}s before giving up…")
+    time.sleep(final_wait)
+
+    raise Exception(f"Max retries reached for posting: {last_error}")
 
 def post_text(text: str):
     """
