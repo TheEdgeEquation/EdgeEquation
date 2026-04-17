@@ -1,27 +1,25 @@
 from core.posting import post_text
-import json
-from pathlib import Path
-from datetime import datetime
-
-FACTS_PATH = Path("data/facts.json")
+from core.formatting import format_overseas_fact
+from core.scheduler_state import get_index
+from edge_equation.engines.facts import _load_facts
 
 def run():
-    print("Running Overseas Fact Mode")
+    # Load all facts from JSON
+    facts = _load_facts()
 
-    if not FACTS_PATH.exists():
-        print("ERROR: facts.json not found.")
-        return
+    # Filter for overseas facts
+    overseas = [f for f in facts if "overseas" in f.get("tags", [])]
 
-    with open(FACTS_PATH, "r", encoding="utf-8") as f:
-        facts = json.load(f)
+    if not overseas:
+        text = format_overseas_fact("No overseas facts available.")
+        post_text(text)
+        return text
 
-    overseas_facts = [f for f in facts if 61 <= f["id"] <= 120]
-    if not overseas_facts:
-        print("ERROR: No overseas facts found.")
-        return
+    # Deterministic rotation
+    idx = get_index("fact_overseas") % len(overseas)
+    raw = overseas[idx]["text"]
 
-    index = datetime.utcnow().timetuple().tm_yday % len(overseas_facts)
-    fact = overseas_facts[index]
-
-    text = f"🌍 Overseas Fact of the Day\n\n{fact['text']}\n\n#AnalyticsNotFeelings"
+    # Format + post
+    text = format_overseas_fact(raw)
     post_text(text)
+    return text
