@@ -76,5 +76,13 @@ MODES.update({
     "fact_domestic": domestic,
     "fact_overseas": overseas,
 })
+from .spotlight import run as spotlight
+from .results import run as results
+
+MODES.update({
+    "spotlight": spotlight,
+    "results": results,
+})
+
 
 
