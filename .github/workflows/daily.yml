@@ -2,7 +2,8 @@ name: Edge Equation — Daily
 
 on:
   schedule:
-    - cron: "30 17 * * *"   # 11:30 AM CST
+    - cron: "30 12 * * *"   # 7:30 AM CT (12:30 UTC)
+
   workflow_dispatch:
 
 jobs:
