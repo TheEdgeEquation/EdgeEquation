@@ -1,58 +1,33 @@
+# main.py
+
+import argparse
 import sys
-import logging
 from modes import MODES
 
-# ------------------------------------------------------------
-# Logging Configuration
-# ------------------------------------------------------------
-logging.basicConfig(
-    level=logging.INFO,
-    format="[%(levelname)s] %(message)s"
-)
-logger = logging.getLogger(__name__)
-
-
-# ------------------------------------------------------------
-# Main Dispatcher
-# ------------------------------------------------------------
 def main():
-    """
-    Entry point for Edge Equation 3.0.
-    Usage:
-        python main.py <mode>
-
-    Example:
-        python main.py daily_email
-        python main.py gotd
-        python main.py primary_signal
-    """
-    if len(sys.argv) < 2:
-        print("\nUsage: python main.py <mode>\n")
-        print("Available modes:")
-        for m in sorted(MODES.keys()):
-            print(f"  - {m}")
-        print()
-        return
-
-    mode = sys.argv[1]
+    parser = argparse.ArgumentParser(description="Edge Equation Mode Runner")
+    parser.add_argument(
+        "--mode",
+        type=str,
+        required=True,
+        help="Mode to run (see MODES in modes/__init__.py)"
+    )
+    args = parser.parse_args()
+    mode = args.mode.strip()
 
     if mode not in MODES:
-        print(f"\nUnknown mode: {mode}\n")
-        print("Available modes:")
-        for m in sorted(MODES.keys()):
-            print(f"  - {m}")
-        print()
-        return
+        print(f"[ERROR] Unknown mode: {mode}")
+        print(f"Available modes: {', '.join(MODES.keys())}")
+        sys.exit(1)
 
-    logger.info(f"MODE: {mode}")
+    print(f"[INFO] Running mode: {mode}")
     try:
-        MODES[mode]()   # No dry_run / no_graphic
+        MODES[mode]()   # Execute the selected mode
     except Exception as e:
-        logger.error(f"Mode '{mode}' failed: {e}")
+        print(f"[ERROR] Mode '{mode}' failed: {e}")
+        sys.exit(1)
 
+    print(f"[INFO] Mode '{mode}' completed successfully.")
 
-# ------------------------------------------------------------
-# Entrypoint Guard
-# ------------------------------------------------------------
 if __name__ == "__main__":
     main()
