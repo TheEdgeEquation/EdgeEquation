@@ -1,31 +1,29 @@
-name: Edge Equation — Unified Scheduler
+name: Edge Equation Posting Scheduler
 
 on:
-  schedule:
-    # Domestic Fact — 7:30 AM CT = 12:30 UTC
-    - cron: "30 12 * * *"
-    # Morning Edges — 10:30 AM CT = 15:30 UTC
-    - cron: "30 15 * * *"
-    # Spotlight — 3:30 PM CT = 20:30 UTC
-    - cron: "30 20 * * *"
-    # Evening Edges — 6:00 PM CT = 23:00 UTC
-    - cron: "0 23 * * *"
-    # Results — 9:30 PM CT = 02:30 UTC (next day)
-    - cron: "30 2 * * *"
-    # Overseas Fact — 1:00 AM CT = 06:00 UTC
-    - cron: "0 6 * * *"
-
   workflow_dispatch:
     inputs:
       mode:
-        description: "Manual mode override"
-        required: false
-        default: "daily"
+        description: "Select the mode to run"
+        required: true
+        type: choice
+        options:
+          - fact_domestic
+          - edges_morning
+          - spotlight
+          - edges_evening
+          - results
+
+  schedule:
+    - cron: "30 12 * * *"   # 7:30 AM CT → fact_domestic
+    - cron: "30 15 * * *"   # 10:30 AM CT → edges_morning
+    - cron: "30 20 * * *"   # 3:30 PM CT → spotlight
+    - cron: "0 23 * * *"    # 6:00 PM CT → edges_evening
+    - cron: "30 2 * * *"    # 9:30 PM CT → results
 
 jobs:
-  run-scheduled-mode:
+  run_mode:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
 
     steps:
       - name: Checkout repo
@@ -39,39 +37,5 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Determine mode
-        id: mode
-        run: |
-          SCHEDULE="${{ github.event.schedule }}"
-
-          if   [ "$SCHEDULE" = "30 12 * * *" ]; then
-            echo "mode=fact_domestic" >> "$GITHUB_OUTPUT"
-          elif [ "$SCHEDULE" = "30 15 * * *" ]; then
-            echo "mode=edges_morning" >> "$GITHUB_OUTPUT"
-          elif [ "$SCHEDULE" = "30 20 * * *" ]; then
-            echo "mode=spotlight" >> "$GITHUB_OUTPUT"
-          elif [ "$SCHEDULE" = "0 23 * * *" ]; then
-            echo "mode=edges_evening" >> "$GITHUB_OUTPUT"
-          elif [ "$SCHEDULE" = "30 2 * * *" ]; then
-            echo "mode=results" >> "$GITHUB_OUTPUT"
-          elif [ "$SCHEDULE" = "0 6 * * *" ]; then
-            echo "mode=fact_overseas" >> "$GITHUB_OUTPUT"
-          else
-            echo "mode=${{ github.event.inputs.mode }}" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Run Edge Equation mode
-        run: python main.py ${{ steps.mode.outputs.mode }}
-        env:
-          ODDS_API_KEY:        ${{ secrets.ODDS_API_KEY }}
-          MMA_API_KEY:         ${{ secrets.MMA_API_KEY }}
-          X_API_KEY:           ${{ secrets.X_API_KEY }}
-          X_API_SECRET:        ${{ secrets.X_API_SECRET }}
-          X_ACCESS_TOKEN:      ${{ secrets.X_ACCESS_TOKEN }}
-          X_ACCESS_SECRET:     ${{ secrets.X_ACCESS_SECRET }}
-          EMAIL_FROM:          ${{ secrets.EMAIL_FROM }}
-          EMAIL_TO:            ${{ secrets.EMAIL_TO }}
-          EMAIL_PASSWORD:      ${{ secrets.EMAIL_PASSWORD }}
-          EMAIL_SMTP:          ${{ secrets.EMAIL_SMTP }}
-          OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
-          FOOTBALL_DATA_KEY:   ${{ secrets.FOOTBALL_DATA_KEY }}
+      - name: Run selected mode
+        run: python main.py --mode "${{ github.event.inputs.mode }}"
