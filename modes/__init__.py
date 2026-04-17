@@ -63,3 +63,11 @@ MODES = {
     "global_high_confidence_outlier": run_global_high_confidence_outlier,
     "global_secondary_alignment": run_global_secondary_alignment,
 }
+from .edges import morning, evening
+
+MODES = {
+    "edges_morning": morning,
+    "edges_evening": evening,
+    # ...existing modes...
+}
+
