@@ -1,7 +1,9 @@
 from core.posting import post_text
 from core.formatting import format_spotlight
+from engines.spotlight import get_spotlight
 
 def run():
-    text = format_spotlight()
+    body = get_spotlight()
+    text = format_spotlight(body)
     post_text(text)
     return text
