@@ -5,8 +5,12 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import os
 
+# Your Gmail address
 GMAIL_USER = "ProfessorEdgeCash@gmail.com"
+
+# New environment variable you will set in GitHub Actions or your server
 GMAIL_PASS = os.getenv("GMAIL_APP_PASSWORD")
+
 
 def send_email(subject: str, body: str, to: str = GMAIL_USER):
     """
@@ -22,6 +26,7 @@ def send_email(subject: str, body: str, to: str = GMAIL_USER):
 
     msg.attach(MIMEText(body, "plain"))
 
+    # Gmail SMTP SSL endpoint
     with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
         server.login(GMAIL_USER, GMAIL_PASS)
         server.send_message(msg)
@@ -32,6 +37,7 @@ def send_fallback_email(mode: str, text: str, error: str, wal_id: str):
     Sends a fallback email when posting to X fails after all retries.
     """
     subject = f"[EDGE FAILSAFE] {mode} failed to post"
+
     body = f"""
 Mode: {mode}
 WAL ID: {wal_id}
