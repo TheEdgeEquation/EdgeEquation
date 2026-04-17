@@ -14,9 +14,8 @@ def _load_facts():
 
     path = "data/facts.json"
 
-
     if not os.path.exists(path):
-        raise FileNotFoundError("facts.json not found")
+        raise FileNotFoundError(f"facts.json not found at {path}")
 
     with open(path, "r") as f:
         data = json.load(f)
@@ -30,8 +29,8 @@ def _load_facts():
         return combined
 
     # If already a flat list
-    if isinstance(data, list):
-        return data
+    return data
+
 
     raise ValueError("facts.json is not in a supported format")
 
