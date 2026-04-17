@@ -119,8 +119,7 @@ def run_system_status(dry_run, no_graphic):
         logger.info("[DRY RUN] System status:\n" + caption)
 
 
-def run_daily_email(dry_run, no_graphic):
-    logger.info("MODE: daily_email")
+daily_email")
     internal_acc, public_acc = compute_full_accuracy()
     engine_accuracy_text = (
     f"MLB Games: {internal_acc['mlb_games'][0]}-{internal_acc['mlb_games'][1]}\n"
