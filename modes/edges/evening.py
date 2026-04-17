@@ -1,12 +1,13 @@
-# modes/edges/evening.py
+from core.posting import post_text
 
 def run():
-    """
-    Evening Edges Window (6:00 PM CT)
-    Placeholder-safe version.
-    Replace with your real model logic when ready.
-    """
-    print("Running Evening Edges (placeholder)")
-    # TODO: integrate your evening edges model
-    # TODO: filter for games not started
-    # TODO: format and post edges
+    print("Running Evening Edges Mode")
+
+    # TODO: integrate real edges model
+    text = (
+        "🌙 Evening Edges\n"
+        "Model placeholder — real edges engine not wired yet.\n"
+        "#AnalyticsNotFeelings"
+    )
+
+    post_text(text)
