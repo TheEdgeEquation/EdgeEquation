@@ -9,29 +9,14 @@ from .edges.evening import run as run_edges_evening
 from .spotlight.run import run as run_spotlight
 from .results.run import run as run_results
 
-# Legacy modes that still work AND do not import broken engine modules
-from .legacy.daily import run_daily
-from .legacy.gotd import run_gotd
-from .legacy.potd import run_potd
-from .legacy.system_status import run_system_status
-
 # IMPORTANT:
-# Removed broken imports:
-# from .legacy.daily_email import run_daily_email
-# from .legacy.results import run_results_legacy
+# All legacy imports removed because the folder no longer exists.
 
 MODES = {
-    # New architecture
     "fact_domestic": run_fact_domestic,
     "fact_overseas": run_fact_overseas,
     "edges_morning": run_edges_morning,
     "edges_evening": run_edges_evening,
     "spotlight": run_spotlight,
     "results": run_results,
-
-    # Legacy (still functional)
-    "daily": run_daily,
-    "gotd": run_gotd,
-    "potd": run_potd,
-    "system_status": run_system_status,
 }
