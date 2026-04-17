@@ -1,6 +1,8 @@
 import argparse
 import logging
 from email_sender import send_email
+from engine.email_builder import build_daily_brief
+
 
 from datetime import datetime
 
@@ -147,17 +149,142 @@ def run_daily_email(dry_run, no_graphic):
 
         bankroll = get_bankroll_summary()
 
+        # ---------------------------------------------------------
+        # 1) GRAPHIC PROMPT + PICKS INSIDE THE GRAPHIC (B graphic)
+        # ---------------------------------------------------------
+        # For now, we build a simple text version using NRFI/YRFI
+        # and any other plays you decide to include.
+        # You can later swap this for your dedicated graphic prompt builder.
+        first_inning_lines = []
+        for p in nrfi_plays:
+            label = p.get("prop_label")
+            book = p.get("book", "PrizePicks")
+            team = p.get("team") or p.get("game_id", "Unknown game")
+            edge = p.get("edge", 0)
+            first_inning_lines.append(
+                f"{label} | {team} | {book} | edge={edge:.3f}"
+            )
+
+        graphic_picks_text = "\n".join(first_inning_lines)
+
+        graphic_prompt_text = "\n".join([
+            "EDGE EQUATION — DAILY",
+            "",
+            "Sections:",
+            "• First Inning Plays (NRFI/YRFI)",
+            "• Long Ball Alerts (HR props)",
+            "• The Outlier",
+            "• Smash of the Day",
+            "• Sharp Signal",
+            "",
+            "Use the picks listed below to populate each section.",
+        ])
+
+        # ---------------------------------------------------------
+        # 2) ENGINE ACCURACY (INTERNAL) + 3) PUBLIC ACCURACY
+        # ---------------------------------------------------------
+        # For now, we keep these as placeholders until we refactor
+        # the results pipeline to return structured stats instead of tweets.
+        engine_accuracy_text = (
+            "Engine accuracy section placeholder.\n"
+            "Wire this to your results/graded plays pipeline when ready."
+        )
+
+        public_accuracy_text = (
+            "Public accuracy section placeholder.\n"
+            "Wire this to your public-pick tracking when ready."
+        )
+
+        # ---------------------------------------------------------
+        # 4) PERSONAL PARLAY
+        # ---------------------------------------------------------
+        personal_parlay_text = str(personal_parlay)
+
+        # ---------------------------------------------------------
+        # 5) PERSONAL TOP 10 GRADED PICKS (WITH LETTER GRADES)
+        # ---------------------------------------------------------
+        # You can refine this grading logic later; for now we sort by edge.
+        all_plays = _sort_by_edge(_load_all_today_plays())
+        personal_top10 = all_plays[:10]
+
+        def _grade(edge: float) -> str:
+            if edge >= 0.12:
+                return "A"
+            if edge >= 0.08:
+                return "B"
+            if edge >= 0.05:
+                return "C"
+            if edge >= 0.02:
+                return "D"
+            return "F"
+
+        personal_top10_lines = []
+        for i, p in enumerate(personal_top10, start=1):
+            edge = p.get("edge", 0.0)
+            grade = _grade(edge)
+            desc = p.get("description") or p.get("prop_label") or "Play"
+            personal_top10_lines.append(
+                f"{i}. {desc} — edge={edge:.3f} — Grade {grade}"
+            )
+
+        personal_top10_text = "\n".join(personal_top10_lines)
+
+        # ---------------------------------------------------------
+        # 6) TOP 10 PROPS (WITH LETTER GRADES)
+        # ---------------------------------------------------------
+        prop_plays = _filter_props(all_plays)
+        top10_props = prop_plays[:10]
+
+        prop_top10_lines = []
+        for i, p in enumerate(top10_props, start=1):
+            edge = p.get("edge", 0.0)
+            grade = _grade(edge)
+            desc = p.get("description") or p.get("prop_label") or "Prop"
+            prop_top10_lines.append(
+                f"{i}. {desc} — edge={edge:.3f} — Grade {grade}"
+            )
+
+        prop_top10_text = "\n".join(prop_top10_lines)
+
+        # ---------------------------------------------------------
+        # 7) FULL PUBLIC CARD (ALL PICKS BEING POSTED TODAY)
+        # ---------------------------------------------------------
+        # For now, we mirror the personal top plays; you can later
+        # restrict this to only the subset you actually post.
+        public_card_lines = []
+        for p in personal_top10:
+            edge = p.get("edge", 0.0)
+            desc = p.get("description") or p.get("prop_label") or "Play"
+            public_card_lines.append(f"{desc} — edge={edge:.3f}")
+
+        public_card_text = "\n".join(public_card_lines)
+
+        # ---------------------------------------------------------
+        # BUILD EMAIL BODY
+        # ---------------------------------------------------------
+        body = build_daily_brief(
+            graphic_prompt_text=graphic_prompt_text,
+            graphic_picks_text=graphic_picks_text,
+            engine_accuracy_text=engine_accuracy_text,
+            public_accuracy_text=public_accuracy_text,
+            personal_parlay_text=personal_parlay_text,
+            personal_top10_text=personal_top10_text,
+            prop_top10_text=prop_top10_text,
+            public_card_text=public_card_text,
+        )
+
         if not dry_run:
             send_email(
-    subject="Edge Equation — Daily Graphic Prompt",
-    body="Your daily graphic prompt is ready."
-)
-logger.info("Daily email sent")
+                subject="Edge Equation — Daily Intelligence Brief",
+                body=body,
+            )
+            logger.info("Daily intelligence brief email sent")
         else:
-            logger.info("[DRY RUN] Daily email generated")
+            logger.info("[DRY RUN] Daily intelligence brief generated:\n" + body)
 
     except Exception as e:
         logger.error("Daily email failed: " + str(e))
+
 
 
 def run_first_inning_potd(dry_run, no_graphic):
