@@ -1,0 +1,49 @@
+# core/emailer.py
+
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import os
+
+GMAIL_USER = "ProfessorEdgeCash@gmail.com"
+GMAIL_PASS = os.getenv("GMAIL_APP_PASSWORD")
+
+def send_email(subject: str, body: str, to: str = GMAIL_USER):
+    """
+    Sends a plain-text email using Gmail SMTP + App Password.
+    """
+    if not GMAIL_PASS:
+        raise RuntimeError("GMAIL_APP_PASSWORD environment variable is missing.")
+
+    msg = MIMEMultipart()
+    msg["From"] = GMAIL_USER
+    msg["To"] = to
+    msg["Subject"] = subject
+
+    msg.attach(MIMEText(body, "plain"))
+
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+        server.login(GMAIL_USER, GMAIL_PASS)
+        server.send_message(msg)
+
+
+def send_fallback_email(mode: str, text: str, error: str, wal_id: str):
+    """
+    Sends a fallback email when posting to X fails after all retries.
+    """
+    subject = f"[EDGE FAILSAFE] {mode} failed to post"
+    body = f"""
+Mode: {mode}
+WAL ID: {wal_id}
+Error: {error}
+
+--- TEXT THAT WOULD HAVE POSTED ---
+{text}
+
+--- COPY/PASTE BLOCK ---
+{text}
+
+This was automatically sent because X returned repeated errors.
+    """.strip()
+
+    send_email(subject, body)
