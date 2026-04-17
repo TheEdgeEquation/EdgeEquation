@@ -1,20 +1,20 @@
 from core.posting import post_text
 from core.formatting import format_domestic_fact
-from modes.facts.facts import _load_facts
 from core.scheduler_state import get_index
+from edge_equation.engines.facts import _load_facts
 
 def run():
-    # Load all domestic facts
-    facts = [f for f in _load_facts() if "domestic" in f["tags"]]
+    facts = _load_facts()
+    domestic = [f for f in facts if "domestic" in f.get("tags", [])]
 
-    # Determine which fact to use today
-    idx = get_index("fact_domestic") % len(facts)
-    raw = facts[idx]["text"]
+    if not domestic:
+        text = format_domestic_fact("No domestic facts available.")
+        post_text(text)
+        return text
 
-    # Format the fact
+    idx = get_index("fact_domestic") % len(domestic)
+    raw = domestic[idx]["text"]
+
     text = format_domestic_fact(raw)
-
-    # Post it
     post_text(text)
-
     return text
