@@ -1,29 +1,16 @@
 # engines/spotlight.py
-from core.twitter_client import post_text
 
+from datetime import datetime
 
-def _select_spotlight_game() -> dict:
+def get_spotlight():
     """
-    Placeholder spotlight selector.
-    Later this will pull from your model:
-    - biggest game of the night
-    - highest leverage matchup
-    - most interesting pitching or lineup signal
+    Spotlight engine returns a single cross-sport highlight pick.
     """
     return {
-        "text": "When a pitcher’s slider usage jumps above 38%, league-wide chase rate increases by 11%.",
-        "hashtags": "#MLB #Analytics"
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "sport": "NBA",
+        "player": "Luka Doncic",
+        "prop": "Over 8.5 assists",
+        "confidence": 0.63,
+        "reason": "High usage rate vs weak perimeter defense",
     }
-
-
-def post_spotlight_insight():
-    game = _select_spotlight_game()
-
-    status = (
-        "Spotlight Game Insight:\n"
-        f"{game['text']}\n\n"
-        "The engine notices patterns.\n"
-        f"{game['hashtags']}"
-    )
-
-    post_text(status)
