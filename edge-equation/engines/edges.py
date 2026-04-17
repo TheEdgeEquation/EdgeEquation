@@ -29,3 +29,9 @@ def post_evening_edges():
     edges = _fetch_valid_edges("evening")
     for edge in edges:
         post_text(_format_edge(edge))
+        from core.posting import post_text
+from core.formatting import format_domestic_fact
+# ...
+text = format_domestic_fact(fact["text"])
+post_text(text)
+
