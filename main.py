@@ -2,6 +2,7 @@ import argparse
 import logging
 from email_sender import send_email
 from engine.email_builder import build_daily_brief
+from engine.accuracy_engine import compute_full_accuracy
 
 
 from datetime import datetime
@@ -116,6 +117,22 @@ def run_system_status(dry_run, no_graphic):
 
 def run_daily_email(dry_run, no_graphic):
     logger.info("MODE: daily_email")
+    internal_acc, public_acc = compute_full_accuracy()
+
+engine_accuracy_text = (
+    f"MLB Games: {internal_acc['mlb_games'][0]}-{internal_acc['mlb_games'][1]}\n"
+    f"Pitchers: {internal_acc['pitchers'][0]}-{internal_acc['pitchers'][1]}\n"
+    f"NRFI/YRFI: {internal_acc['nrfi'][0]}-{internal_acc['nrfi'][1]}\n"
+    f"Global: {internal_acc['global']}\n"
+)
+
+public_accuracy_text = (
+    f"MLB Games: {public_acc['mlb_games'][0]}-{public_acc['mlb_games'][1]}\n"
+    f"Pitchers: {public_acc['pitchers'][0]}-{public_acc['pitchers'][1]}\n"
+    f"NRFI/YRFI: {public_acc['nrfi'][0]}-{public_acc['nrfi'][1]}\n"
+    f"Global: {public_acc['global']}\n"
+)
+
 
     try:
         # Core projections
