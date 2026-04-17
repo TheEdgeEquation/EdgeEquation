@@ -1,13 +1,7 @@
 # core/posting.py
 
 import time
-from core.formatting import format_domestic_fact
-
-def run():
-    text = format_domestic_fact()
-    post_text(text)
-    return text
-
+from core.x_client import get_x_client
 
 def _log(message: str):
     """Simple internal logger."""
@@ -16,7 +10,7 @@ def _log(message: str):
 def post_text(text: str):
     """
     Unified text posting function.
-    All modes call this.
+    All automated modes call this.
     """
     _log("Preparing text post")
 
@@ -35,7 +29,7 @@ def post_text(text: str):
 def post_graphic(text: str, image_path: str):
     """
     Unified graphic posting function.
-    All modes call this.
+    Manual graphic modes call this.
     """
     _log("Preparing graphic post")
 
