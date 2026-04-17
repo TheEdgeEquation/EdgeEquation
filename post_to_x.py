@@ -2,6 +2,44 @@ import os
 import logging
 import tweepy
 from datetime import datetime
+
+import time
+import requests
+
+def post_with_retry(post_func, text, max_retries=5):
+    """
+    Retry wrapper for posting to X.
+    Retries only on transient 5xx errors.
+    Deterministic, exponential backoff.
+    """
+    for attempt in range(1, max_retries + 1):
+        try:
+            return post_func(text)
+
+        except requests.exceptions.HTTPError as e:
+            status = e.response.status_code
+
+            # Retry only on transient server errors
+            if status in (500, 502, 503, 504):
+                wait = 2 ** attempt  # exponential backoff
+                print(f"[POSTING] Transient {status} error. Retry {attempt}/{max_retries} in {wait}s")
+                time.sleep(wait)
+                continue
+
+            # Non‑retryable error → fail immediately
+            print(f"[POSTING] Non‑retryable error {status}: {e}")
+            raise
+
+        except Exception as e:
+            # Network glitch or unknown transient failure
+            wait = 2 ** attempt
+            print(f"[POSTING] Unexpected error on attempt {attempt}: {e}. Retrying in {wait}s")
+            time.sleep(wait)
+            continue
+
+    # If all retries fail:
+    raise RuntimeError(f"[POSTING] Failed after {max_retries} retries.")
+
  
 logger = logging.getLogger(__name__)
  
