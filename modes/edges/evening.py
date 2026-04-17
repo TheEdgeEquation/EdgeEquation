@@ -1,13 +1,7 @@
-from core.posting import post_text
+from core.posting import post_to_x
+from core.formatting import format_edges_evening
 
 def run():
-    print("Running Evening Edges Mode")
-
-    # TODO: integrate real edges model
-    text = (
-        "🌙 Evening Edges\n"
-        "Model placeholder — real edges engine not wired yet.\n"
-        "#AnalyticsNotFeelings"
-    )
-
-    post_text(text)
+    text = format_edges_evening()
+    post_to_x(text)
+    return text
