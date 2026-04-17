@@ -3,7 +3,6 @@
 # ------------------------------------------------------------
 # Legacy Modes
 # ------------------------------------------------------------
-from .legacy.system_status import run_system_status
 from .legacy.daily import run_daily
 from .legacy.gotd import run_gotd
 from .legacy.potd import run_potd
