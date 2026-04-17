@@ -7,7 +7,7 @@ from core.formatting import format_insight_block
 def build_mlb_insight():
     """
     Returns a dict with the 7-bullet MLB insight structure.
-    Replace the placeholder logic with your model outputs.
+    Replace placeholder logic with your model outputs.
     """
 
     return {
