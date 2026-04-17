@@ -1,13 +1,7 @@
-from core.posting import post_text
+from core.posting import post_to_x
+from core.formatting import format_results
 
 def run():
-    print("Running Results Mode")
-
-    # TODO: integrate real results validator + pick tracking
-    text = (
-        "📊 Daily Results\n"
-        "Results engine placeholder — awaiting validator integration.\n"
-        "#AnalyticsNotFeelings"
-    )
-
-    post_text(text)
+    text = format_results()
+    post_to_x(text)
+    return text
