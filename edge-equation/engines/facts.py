@@ -12,7 +12,8 @@ def _load_facts():
     import json
     import os
 
-    path = "edge-equation/data/facts.json"
+    path = "data/facts.json"
+
 
     if not os.path.exists(path):
         raise FileNotFoundError("facts.json not found")
