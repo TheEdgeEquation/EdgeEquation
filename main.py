@@ -328,7 +328,7 @@ public_accuracy_text = (
 
 
 
-def run_first_inning_potd(dry_run, no_graphic):
+
     logger.info("MODE: first_inning_potd")
     try:
         nrfi_plays = calculate_nrfi_plays() or []
