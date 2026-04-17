@@ -401,6 +401,7 @@ def run_gotd(dry_run, no_graphic):
 
         if not dry_run:
             post_tweet(caption)
+            tag_public_pick(top_game)
             logger.info("GOTD posted")
         else:
             logger.info("[DRY RUN] GOTD:\n" + caption)
@@ -427,6 +428,7 @@ def run_potd(dry_run, no_graphic):
 
         if not dry_run:
             post_tweet(caption)
+            tag_public_pick(top_game)
             logger.info("POTD posted")
         else:
             logger.info("[DRY RUN] POTD:\n" + caption)
