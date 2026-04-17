@@ -8,8 +8,32 @@ from core.scheduler_state import get_index, bump_index
 FACTS_PATH = Path("data/facts.json")
 
 
-def _load_facts() -> list[dict]:
-    return json.loads(FACTS_PATH.read_text())
+def _load_facts():
+    import json
+    import os
+
+    path = "edge-equation/data/facts.json"
+
+    if not os.path.exists(path):
+        raise FileNotFoundError("facts.json not found")
+
+    with open(path, "r") as f:
+        data = json.load(f)
+
+    # If grouped by category (domestic/overseas)
+    if isinstance(data, dict):
+        combined = []
+        for group in data.values():
+            if isinstance(group, list):
+                combined.extend(group)
+        return combined
+
+    # If already a flat list
+    if isinstance(data, list):
+        return data
+
+    raise ValueError("facts.json is not in a supported format")
+
 
 
 def _format_fact(fact: dict) -> str:
