@@ -45,37 +45,15 @@ def send_fallback_email(mode: str, text: str, error: str, wal_id: str):
 )
 import json
 
-def build_failsafe_email_body(mode: str, wal_id: str, error: str, payload: dict) -> str:
-
-    pretty_json = json.dumps(payload, indent=2, default=str)
-
-    if mode == "fact_domestic":
-        formatted = format_insight_block("MLB Insight", payload)
-
-    elif mode == "fact_overseas":
-        formatted = format_insight_block("KBO/NPB Insight", payload)
-
-    elif mode in ("edges_morning", "edges_evening"):
-        formatted = format_edges_block(payload)
-
-    elif mode == "spotlight":
-        formatted = format_spotlight_block(payload)
-
-    else:
-        formatted = "(No formatter available for this mode)"
-
+def send_failsafe_email(mode, wal_id, error, payload):
     body = f"""
-Mode: {mode}
-WAL ID: {wal_id}
-Error: {error}
+    Mode: {mode}
+    WAL ID: {wal_id}
+    Error: {error}
+    ...
+    """
+    send_email(body)
 
---- TEXT THAT WOULD HAVE POSTED ---
-{formatted}
 
---- JSON PAYLOAD ---
-{pretty_json}
 
-This was automatically sent because X returned repeated errors.
-"""
-    return body
 
