@@ -38,18 +38,44 @@ def send_fallback_email(mode: str, text: str, error: str, wal_id: str):
     """
     subject = f"[EDGE FAILSAFE] {mode} failed to post"
 
+    from core.formatting import (
+    format_insight_block,
+    format_edges_block,
+    format_spotlight_block
+)
+import json
+
+def build_failsafe_email_body(mode: str, wal_id: str, error: str, payload: dict) -> str:
+
+    pretty_json = json.dumps(payload, indent=2, default=str)
+
+    if mode == "fact_domestic":
+        formatted = format_insight_block("MLB Insight", payload)
+
+    elif mode == "fact_overseas":
+        formatted = format_insight_block("KBO/NPB Insight", payload)
+
+    elif mode in ("edges_morning", "edges_evening"):
+        formatted = format_edges_block(payload)
+
+    elif mode == "spotlight":
+        formatted = format_spotlight_block(payload)
+
+    else:
+        formatted = "(No formatter available for this mode)"
+
     body = f"""
 Mode: {mode}
 WAL ID: {wal_id}
 Error: {error}
 
 --- TEXT THAT WOULD HAVE POSTED ---
-{text}
+{formatted}
 
---- COPY/PASTE BLOCK ---
-{text}
+--- JSON PAYLOAD ---
+{pretty_json}
 
 This was automatically sent because X returned repeated errors.
-    """.strip()
+"""
+    return body
 
-    send_email(subject, body)
