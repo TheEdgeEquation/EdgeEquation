@@ -1,5 +1,7 @@
 import argparse
 import logging
+from email_sender import send_email
+
 from datetime import datetime
 
 from engine.edge_calculator import grade_all_props, calculate_nrfi_plays
