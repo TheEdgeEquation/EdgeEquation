@@ -1,20 +1,7 @@
-from core.posting import post_text
-
-def _select_spotlight_insight():
-    return (
-        "When a pitcher increases slider usage above 38%, "
-        "league-wide chase rate rises by 11%."
-    )
+from core.posting import post_to_x
+from core.formatting import format_spotlight
 
 def run():
-    print("Running Spotlight Mode")
-
-    insight = _select_spotlight_insight()
-
-    text = (
-        "🔦 Spotlight Insight\n\n"
-        f"{insight}\n\n"
-        "#MLB #AnalyticsNotFeelings"
-    )
-
-    post_text(text)
+    text = format_spotlight()
+    post_to_x(text)
+    return text
