@@ -128,3 +128,64 @@ def format_spotlight_block(payload: dict) -> str:
     ]
 
     return "\n".join(lines)
+
+# ---------------------------------------------------------
+# 4. RESULTS FORMATTER (FULL PREMIUM BREAKDOWN)
+# ---------------------------------------------------------
+def format_results_block(payload: dict) -> str:
+    """
+    payload structure:
+    {
+      'timestamp': ...,
+      'results': [
+         {
+           'label': 'Yankees ML',
+           'outcome': 'HIT' or 'MISS',
+           'key_metric': ...,
+           'context': ...,
+           'model_signal': ...,
+           'trend': ...,
+           'matchup_delta': ...,
+           'historical_comp': ...,
+           'final_score': '5–2',
+         },
+         ...
+      ],
+      'totals': {
+         'correct': 8,
+         'total': 12,
+         'ev_delta': 1.14
+      }
+    }
+    """
+
+    date_str = _fmt_date(payload.get("timestamp", ""))
+
+    lines = [f"📊 Results — {date_str}", ""]
+
+    # Game-by-game breakdown
+    for r in payload.get("results", []):
+        lines.append(f"{r.get('label', 'Pick')} — {r.get('outcome', 'N/A')}")
+        lines.append(f"• Key Metric: {r.get('key_metric', 'N/A')}")
+        lines.append(f"• Context: {r.get('context', 'N/A')}")
+        lines.append(f"• Model Signal: {r.get('model_signal', 'N/A')}")
+        lines.append(f"• Trend: {r.get('trend', 'N/A')}")
+        lines.append(f"• Matchup Delta: {r.get('matchup_delta', 'N/A')}")
+        lines.append(f"• Historical Comparison: {r.get('historical_comp', 'N/A')}")
+        lines.append(f"• Outcome: {r.get('final_score', 'N/A')}")
+        lines.append("")
+
+    # Totals
+    totals = payload.get("totals", {})
+    correct = totals.get("correct", 0)
+    total = totals.get("total", 0)
+    ev_delta = totals.get("ev_delta", 0)
+
+    lines.append("Totals:")
+    lines.append(f"• Correct: {correct} of {total} ({round((correct/total)*100) if total else 0}%)")
+    lines.append(f"• EV Delta: {ev_delta:+.2f} units")
+    lines.append("")
+    lines.append("#AnalyticsNotFeelings")
+
+    return "\n".join(lines)
+
