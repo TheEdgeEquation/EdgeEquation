@@ -36,4 +36,4 @@ jobs:
           FOOTBALL_DATA_KEY: ${{ secrets.FOOTBALL_DATA_KEY }}
         run: |
           echo "Running daily"
-          python main.py --mode daily
+          python main.py daily
