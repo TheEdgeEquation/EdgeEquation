@@ -3,7 +3,6 @@
 # ------------------------------------------------------------
 # Legacy Modes
 # ------------------------------------------------------------
-from .legacy.daily_email import run_daily_email
 from .legacy.system_status import run_system_status
 from .legacy.daily import run_daily
 from .legacy.gotd import run_gotd
