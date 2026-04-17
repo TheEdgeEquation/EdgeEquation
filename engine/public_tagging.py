@@ -18,26 +18,24 @@ def _save_public_tags(data):
         json.dump(data, f, indent=2)
 
 
-def tag_public_pick(play):
-    """
-    play: the full play dictionary (edge, prop_label, game_id, etc.)
-    """
+def tag_public_pick(play, category: str):
     data = _load_public_tags()
     date_key = datetime.now().strftime("%Y-%m-%d")
 
     if date_key not in data:
         data[date_key] = []
 
-    # Store only the essential fields for accuracy tracking
     data[date_key].append({
+        "category": category,
         "game_id": play.get("game_id"),
         "prop_label": play.get("prop_label"),
         "side": play.get("side"),
         "edge": play.get("edge"),
-        "result": play.get("result"),  # filled in later by results loader
+        "result": play.get("result"),  # filled in later
     })
 
     _save_public_tags(data)
+
 
 
 def get_public_picks_for_today():
