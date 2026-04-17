@@ -1,58 +1,29 @@
 # core/formatting.py
-
 from datetime import datetime
 
-BRAND_TAG = "#AnalyticsNotFeelings"
+def format_insight_block(label: str, insight: dict) -> str:
+    """
+    label: 'MLB Insight' or 'KBO/NPB Insight'
+    insight: {
+      'timestamp', 'league', 'entity', 'prop_or_angle',
+      'key_metric', 'context', 'model_signal',
+      'trend', 'matchup_delta', 'historical_comp',
+      'edge_summary'
+    }
+    """
+    date_str = datetime.fromisoformat(insight["timestamp"].replace("Z", "")).strftime("%Y-%m-%d")
 
-def _today_tag():
-    return datetime.utcnow().strftime("%Y-%m-%d")
-
-# ---------- FACTS ----------
-
-def format_domestic_fact(text: str) -> str:
-    return (
-        f"📊 Domestic Fact of the Day — {_today_tag()}\n\n"
-        f"{text}\n\n"
-        f"{BRAND_TAG}"
-    )
-
-def format_overseas_fact(text: str) -> str:
-    return (
-        f"🌍 Overseas Fact of the Day — {_today_tag()}\n\n"
-        f"{text}\n\n"
-        f"{BRAND_TAG}"
-    )
-
-# ---------- EDGES ----------
-
-def format_edges_morning(body: str) -> str:
-    return (
-        f"📈 Morning Edges — {_today_tag()}\n\n"
-        f"{body}\n\n"
-        f"{BRAND_TAG}"
-    )
-
-def format_edges_evening(body: str) -> str:
-    return (
-        f"🌙 Evening Edges — {_today_tag()}\n\n"
-        f"{body}\n\n"
-        f"{BRAND_TAG}"
-    )
-
-# ---------- SPOTLIGHT ----------
-
-def format_spotlight(insight: str) -> str:
-    return (
-        f"🔦 Spotlight Insight — {_today_tag()}\n\n"
-        f"{insight}\n\n"
-        f"#MLB {BRAND_TAG}"
-    )
-
-# ---------- RESULTS ----------
-
-def format_results(summary: str) -> str:
-    return (
-        f"📊 Daily Results — {_today_tag()}\n\n"
-        f"{summary}\n\n"
-        f"{BRAND_TAG}"
-    )
+    lines = [
+        f"📊 {label} — {date_str}",
+        "",
+        f"• Key Metric: {insight['key_metric']}",
+        f"• Context: {insight['context']}",
+        f"• Model Signal: {insight['model_signal']}",
+        f"• Trend: {insight['trend']}",
+        f"• Matchup Delta: {insight['matchup_delta']}",
+        f"• Historical Comparison: {insight['historical_comp']}",
+        f"• Edge Summary: {insight['edge_summary']}",
+        "",
+        "#AnalyticsNotFeelings",
+    ]
+    return "\n".join(lines)
