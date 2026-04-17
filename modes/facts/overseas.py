@@ -1,20 +1,7 @@
 from core.posting import post_text
-from core.formatting import format_overseas_fact
-from core.scheduler_state import get_index
-from engines.facts import _load_facts
+from core.formatting import format_insight_block
 
 def run():
-    facts = _load_facts()
-    overseas = [f for f in facts if "overseas" in f.get("tags", [])]
-
-    if not overseas:
-        text = format_overseas_fact("No overseas facts available.")
-        post_text(text)
-        return text
-
-    idx = get_index("fact_overseas") % len(overseas)
-    raw = overseas[idx]["text"]
-
-    text = format_overseas_fact(raw)
-    post_text(text)
-    return text
+    insight = build_kbo_npb_insight()
+    text = format_insight_block("KBO/NPB Insight", insight)
+    post_text(text, mode="fact_overseas", payload=insight)
