@@ -1,28 +1,23 @@
 # engines/results.py
-from core.twitter_client import post_text
 
+from datetime import datetime
 
-def _fetch_hits() -> list[dict]:
+def get_results():
     """
-    Placeholder results fetcher.
-    Later this will:
-    - read your stored posted edges
-    - check which ones hit
-    - return a list of hits
+    Results engine returns a structured summary of yesterday's outcomes.
+    Replace with real scraper/model output later.
     """
-    return []  # safe default: no results posted
-
-
-def post_results_if_any():
-    hits = _fetch_hits()
-    if not hits:
-        return  # no post if nothing hit
-
-    # Simple summary for now
-    summary = (
-        f"Posted edges that cleared today: {len(hits)}.\n"
-        "Model performance continues to calibrate.\n"
-        "#Analytics"
-    )
-
-    post_text(summary)
+    return {
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "summary": {
+            "wins": 3,
+            "losses": 1,
+            "pushes": 0,
+        },
+        "details": [
+            {"pick": "Yankees NRFI", "result": "Win"},
+            {"pick": "Dodgers ML", "result": "Win"},
+            {"pick": "Rangers TT Over", "result": "Loss"},
+            {"pick": "Astros F5 ML", "result": "Win"},
+        ]
+    }
