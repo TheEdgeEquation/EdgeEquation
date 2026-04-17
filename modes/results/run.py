@@ -1,16 +1,13 @@
-# modes/results/run.py
+from core.posting import post_text
 
 def run():
-    """
-    Results Post (9:30 PM CT)
-    Placeholder-safe version.
-    Replace with your real results aggregation logic.
-    """
     print("Running Results Mode")
 
-    # TODO: integrate your results validator
-    # TODO: pull today's picks from storage
-    # TODO: compute W/L, units, accuracy
-    # TODO: format results for posting
+    # TODO: integrate real results validator + pick tracking
+    text = (
+        "📊 Daily Results\n"
+        "Results engine placeholder — awaiting validator integration.\n"
+        "#AnalyticsNotFeelings"
+    )
 
-    print("Results placeholder: no results engine wired yet.")
+    post_text(text)
