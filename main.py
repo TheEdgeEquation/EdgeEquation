@@ -326,6 +326,11 @@ def run_first_inning_potd(dry_run, no_graphic):
 
         if not dry_run:
             post_tweet(caption)
+            if not dry_run:
+    post_tweet(caption)
+    tag_public_pick(top_nrfi)
+    logger.info("First Inning POTD posted")
+
             logger.info("First Inning POTD posted")
         else:
             logger.info("[DRY RUN] First Inning POTD:\n" + caption)
