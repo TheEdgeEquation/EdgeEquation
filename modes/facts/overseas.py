@@ -1,16 +1,11 @@
-# modes/facts/overseas.py
-
+from core.posting import post_text
 import json
 from pathlib import Path
+from datetime import datetime
 
 FACTS_PATH = Path("data/facts.json")
 
 def run():
-    """
-    Overseas Fact of the Day (1:00 AM CT)
-    Pulls from IDs 61–120.
-    Placeholder-safe: prints the fact instead of posting.
-    """
     print("Running Overseas Fact Mode")
 
     if not FACTS_PATH.exists():
@@ -21,15 +16,12 @@ def run():
         facts = json.load(f)
 
     overseas_facts = [f for f in facts if 61 <= f["id"] <= 120]
-
     if not overseas_facts:
         print("ERROR: No overseas facts found.")
         return
 
-    # Deterministic selection: rotate based on day of year
-    from datetime import datetime
     index = datetime.utcnow().timetuple().tm_yday % len(overseas_facts)
     fact = overseas_facts[index]
 
-    print(f"Selected Overseas Fact ID {fact['id']}:")
-    print(fact["text"])
+    text = f"🌍 Overseas Fact of the Day\n\n{fact['text']}\n\n#AnalyticsNotFeelings"
+    post_text(text)
