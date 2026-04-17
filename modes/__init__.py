@@ -70,4 +70,11 @@ MODES = {
     "edges_evening": evening,
     # ...existing modes...
 }
+from .facts import domestic, overseas
+
+MODES.update({
+    "fact_domestic": domestic,
+    "fact_overseas": overseas,
+})
+
 
