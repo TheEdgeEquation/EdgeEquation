@@ -1,7 +1,7 @@
 from core.posting import post_text
 from core.formatting import format_domestic_fact
 from core.scheduler_state import get_index
-from edge_equation.engines.facts import _load_facts
+from edge-equation.engines.facts import _load_facts
 
 def run():
     facts = _load_facts()
