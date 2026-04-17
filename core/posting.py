@@ -1,7 +1,6 @@
 # core/posting.py
 
 import time
-from core.posting import post_text
 from core.formatting import format_domestic_fact
 
 def run():
