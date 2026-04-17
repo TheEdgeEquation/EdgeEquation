@@ -61,7 +61,8 @@ jobs:
           fi
 
       - name: Run posting mode
-        run: python main.py --mode ${{ steps.mode.outputs.mode }}
+        run: python main.py --mode ${{ github.event.inputs.mode || steps.mode.outputs.mode }}
+
         working-directory: edge-equation
         env:
           X_API_KEY: ${{ secrets.X_API_KEY }}
