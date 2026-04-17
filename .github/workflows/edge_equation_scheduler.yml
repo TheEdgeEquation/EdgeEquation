@@ -31,6 +31,9 @@ jobs:
       X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
       X_ACCESS_SECRET: ${{ secrets.X_ACCESS_SECRET }}
 
+      # ⭐ ADD THIS LINE ⭐
+      GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
