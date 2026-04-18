@@ -1,61 +1,88 @@
 # core/projections_logger.py
+"""
+Write-Ahead Logger (WAL) for The Edge Equation.
+
+This logger records:
+- posting events
+- retries
+- failures
+- fallback triggers
+- payload snapshots
+
+Each event is written as a single JSONL line:
+    data/wal/posts/YYYY-MM-DD.jsonl
+
+This file NEVER raises exceptions.
+"""
 
 import json
-from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, Optional
+from datetime import datetime, timezone
+from typing import Any, Dict, Optional
 
-BASE_WAL_DIR = Path("data") / "wal" / "projections"
-
-
-def _ensure_wal_dir() -> None:
-    BASE_WAL_DIR.mkdir(parents=True, exist_ok=True)
+from core.utils import generate_id, log_timestamp, today_date
 
 
-def _today_str(ts: Optional[datetime] = None) -> str:
-    ts = ts or datetime.utcnow()
-    return ts.strftime("%Y-%m-%d")
+# ---------------------------------------------------------------------------
+# Directory Setup
+# ---------------------------------------------------------------------------
+
+BASE_DIR = Path("data") / "wal" / "posts"
 
 
-def log_projection(payload: Dict[str, Any]) -> None:
+def _ensure_dir() -> None:
+    BASE_DIR.mkdir(parents=True, exist_ok=True)
+
+
+# ---------------------------------------------------------------------------
+# File Helpers
+# ---------------------------------------------------------------------------
+
+def _wal_file_for_today() -> Path:
+    date_str = today_date()
+    return BASE_DIR / f"{date_str}.jsonl"
+
+
+# ---------------------------------------------------------------------------
+# Core Logger
+# ---------------------------------------------------------------------------
+
+def log_post_event(
+    mode: str,
+    payload: Dict[str, Any],
+    status: str,
+    error: Optional[str] = None,
+) -> None:
     """
-    Append a single projection record to the daily JSONL WAL file.
+    Append a single WAL event.
 
-    Expected core fields (can include more):
-      - projection_id: str
-      - timestamp: ISO 8601 string
-      - sport: str
-      - league: str
-      - game_id: str
-      - home_team: str
-      - away_team: str
-      - start_time: ISO 8601 string
-      - market: str
-      - team: Optional[str]
-      - player: Optional[str]
-      - side: Optional[str]
-      - line: Optional[float]
-      - price: Optional[float]
-      - model_projection: Optional[float]
-      - model_prob: Optional[float]
-      - edge_ev: Optional[float]
-      - mode: str
-      - posted_to_x: bool
+    Fields:
+        event_id: unique ID
+        timestamp: UTC timestamp
+        mode: posting mode
+        status: "success" | "retry" | "failed"
+        payload: snapshot of what was attempted
+        error: optional error message
     """
-    _ensure_wal_dir()
 
-    # Ensure timestamp exists
-    if "timestamp" not in payload:
-        payload["timestamp"] = datetime.utcnow().isoformat() + "Z"
-
-    # Derive date from timestamp for file naming
     try:
-        ts = datetime.fromisoformat(payload["timestamp"].replace("Z", ""))
+        _ensure_dir()
+        wal_file = _wal_file_for_today()
+
+        event = {
+            "event_id": generate_id("post_"),
+            "timestamp": log_timestamp(),
+            "mode": mode,
+            "status": status,
+            "payload": payload,
+        }
+
+        if error:
+            event["error"] = error
+
+        with wal_file.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(event, ensure_ascii=False) + "\n")
+
     except Exception:
-        ts = datetime.utcnow()
-
-    date_str = _today_str(ts)
-    wal_file = BASE_WAL_DIR / f"{date_str}.jsonl"
-
-    with wal_file.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(payload, ensure_ascii=False) + "\n")
+        # Logging must NEVER break the system.
+        pass
