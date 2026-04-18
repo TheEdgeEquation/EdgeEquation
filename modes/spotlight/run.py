@@ -3,30 +3,28 @@
 from datetime import datetime
 from core.posting import post_text
 from core.formatting import format_spotlight_block
+from engines.spotlight import post_spotlight
 
-def build_spotlight_insight():
+
+def run() -> None:
     """
-    Returns a dict with the 7-bullet Spotlight structure.
-    Replace placeholder logic with your model outputs.
+    Spotlight Mode entrypoint.
+
+    - Generates spotlight pick via spotlight engine
+    - Logs projection to WAL (inside post_spotlight)
+    - Formats premium spotlight block
+    - Posts via unified posting engine
     """
 
-    return {
-        "timestamp": datetime.utcnow().isoformat() + "Z",
-        "sport": "NBA",
-        "player": "Luka Doncic",
-        "prop": "Over 8.5 assists",
-        "confidence": 0.63,
-        "key_metric": "17.4 potential assists per game vs this defense",
-        "context": "Opp defense bottom 5 in perimeter rotations",
-        "model_signal": "+0.7 assists above market projection",
-        "trend": "Usage rate 34.7% over last 10 games",
-        "matchup_delta": "+4.8 projected possessions above league average",
-        "historical_comp": "Similar matchup: +1.1 assists above expectation",
-        "edge_summary": "Model favors elevated assist volume in this pace environment."
-    }
+    # 1. Generate spotlight pick + log projection
+    payload = post_spotlight()
 
-
-def run():
-    payload = build_spotlight_insight()
+    # 2. Format spotlight text block
     text = format_spotlight_block(payload)
-    post_text(text, mode="spotlight", payload=payload)
+
+    # 3. Post to X using unified posting engine
+    post_text(
+        text,
+        mode="spotlight",
+        payload=payload,
+    )
