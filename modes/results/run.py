@@ -1,52 +1,41 @@
 # modes/results/run.py
 
-from datetime import datetime
+from datetime import datetime, timedelta
+
 from core.posting import post_text
 from core.formatting import format_results_block
+from core.results_engine import build_results_payload
 
-def build_results_payload():
+
+def _default_results_date() -> str:
     """
-    Replace placeholder logic with your actual results engine.
-    This is the premium 7-bullet structure for each pick.
+    By default, grade yesterday's slate in UTC.
+    Returns YYYY-MM-DD.
     """
-
-    return {
-        "timestamp": datetime.utcnow().isoformat() + "Z",
-
-        "results": [
-            {
-                "label": "Yankees ML",
-                "outcome": "HIT",
-                "key_metric": "31% K-rate advantage",
-                "context": "Opp lineup 27% whiff rate",
-                "model_signal": "+0.31 EV",
-                "trend": "Bullpen +0.18 WPA",
-                "matchup_delta": "+0.12 expected runs",
-                "historical_comp": "Similar matchup +0.09 EV",
-                "final_score": "5–2"
-            },
-            {
-                "label": "Dodgers TT Over",
-                "outcome": "MISS",
-                "key_metric": "+0.18 xwOBA projection",
-                "context": "Opp SP allows 43% hard contact",
-                "model_signal": "+0.22 EV",
-                "trend": "OPS +0.102 last 7 days",
-                "matchup_delta": "+0.14 expected runs",
-                "historical_comp": "Similar matchup +0.11 EV",
-                "final_score": "3 runs"
-            }
-        ],
-
-        "totals": {
-            "correct": 1,
-            "total": 2,
-            "ev_delta": +0.09
-        }
-    }
+    yesterday = datetime.utcnow().date() - timedelta(days=1)
+    return yesterday.strftime("%Y-%m-%d")
 
 
-def run():
-    payload = build_results_payload()
+def run(date_str: str | None = None) -> None:
+    """
+    Results Mode entrypoint.
+
+    - Picks a date (default: yesterday)
+    - Builds the results payload from WAL projections + results
+    - Formats a premium results block
+    - Posts via the unified posting engine
+    """
+    if date_str is None:
+        date_str = _default_results_date()
+
+    payload = build_results_payload(date_str)
     text = format_results_block(payload)
-    post_text(text, mode="results", payload=payload)
+
+    post_text(
+        text,
+        mode="results",
+        payload={
+            "date": date_str,
+            "engine_payload": payload,
+        },
+    )
