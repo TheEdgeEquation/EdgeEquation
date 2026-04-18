@@ -1,13 +1,9 @@
-def format_spotlight_block(payload: dict) -> str:
+def format_smash_block(payload: dict) -> str:
     """
-    Premium Spotlight formatter.
-    Uses the 7‑bullet elite analytics structure.
-    Compatible with results engine + WAL schema.
+    Premium Smash of the Day formatter.
     """
 
-    player = payload.get("player")
-    line = payload.get("line")
-    side = payload.get("side", "").upper()
+    team = payload.get("team")
     sport = payload.get("sport")
     market = payload.get("market")
     model_prob = payload.get("model_prob")
@@ -15,16 +11,16 @@ def format_spotlight_block(payload: dict) -> str:
     reason = payload.get("reason")
     ts = payload.get("timestamp")
 
-    header = f"🔦 Spotlight Insight — {ts[:10]}\n"
+    header = f"💥 Smash of the Day — {ts[:10]}\n"
 
     bullets = [
-        f"• **Play:** {player} — {side} {line}",
+        f"• **Play:** {team} ML",
         f"• **Sport:** {sport}",
         f"• **Market:** {market}",
         f"• **Model Probability:** {model_prob:.2f}",
         f"• **Edge EV:** {edge_ev:.2f}",
         f"• **Why It Pops:** {reason}",
-        f"• **Confidence Signal:** Model‑driven, matchup‑validated",
+        f"• **Confidence Signal:** High‑grade model alignment",
     ]
 
     body = "\n".join(bullets)
