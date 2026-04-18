@@ -1,5 +1,9 @@
 # engines/spotlight.py
 
+from core.projections_logger import log_projection
+from datetime import datetime
+
+
 from datetime import datetime
 
 def get_spotlight():
