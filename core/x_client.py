@@ -1,37 +1,104 @@
 # core/x_client.py
+"""
+X (Twitter) Client Wrapper for The Edge Equation.
+
+- Uses v1.1 API (Essential-tier compatible)
+- Centralizes auth and client creation
+- Provides a single get_x_client() entrypoint
+"""
 
 import os
+from typing import Optional
+
 import tweepy
 
 
-# Load credentials from environment variables
-API_KEY = os.getenv("X_API_KEY")
-API_SECRET = os.getenv("X_API_SECRET")
-ACCESS_TOKEN = os.getenv("X_ACCESS_TOKEN")
-ACCESS_SECRET = os.getenv("X_ACCESS_SECRET")
+_client_cache: Optional[tweepy.API] = None
 
 
-def get_x_client():
+class XClientConfigError(Exception):
+    """Raised when X client configuration is invalid or incomplete."""
+    pass
+
+
+def _load_credentials() -> dict:
     """
-    Returns a Tweepy v1.1 API client for posting text tweets.
+    Load X API credentials from environment variables.
+
+    Required:
+        X_API_KEY
+        X_API_SECRET
+        X_ACCESS_TOKEN
+        X_ACCESS_TOKEN_SECRET
     """
-    if not all([API_KEY, API_SECRET, ACCESS_TOKEN, ACCESS_SECRET]):
-        raise RuntimeError("Missing X API credentials in environment variables.")
+    api_key = os.getenv("X_API_KEY")
+    api_secret = os.getenv("X_API_SECRET")
+    access_token = os.getenv("X_ACCESS_TOKEN")
+    access_token_secret = os.getenv("X_ACCESS_TOKEN_SECRET")
+
+    missing = [
+        name
+        for name, value in [
+            ("X_API_KEY", api_key),
+            ("X_API_SECRET", api_secret),
+            ("X_ACCESS_TOKEN", access_token),
+            ("X_ACCESS_TOKEN_SECRET", access_token_secret),
+        ]
+        if not value
+    ]
+
+    if missing:
+        raise XClientConfigError(
+            f"Missing X credentials: {', '.join(missing)}. "
+            "Set these environment variables before posting."
+        )
+
+    return {
+        "api_key": api_key,
+        "api_secret": api_secret,
+        "access_token": access_token,
+        "access_token_secret": access_token_secret,
+    }
+
+
+def _create_client() -> tweepy.API:
+    """
+    Create a tweepy API client using v1.1 endpoints.
+    """
+    creds = _load_credentials()
 
     auth = tweepy.OAuth1UserHandler(
-        API_KEY,
-        API_SECRET,
-        ACCESS_TOKEN,
-        ACCESS_SECRET
+        creds["api_key"],
+        creds["api_secret"],
+        creds["access_token"],
+        creds["access_token_secret"],
     )
 
-    return tweepy.API(auth)
+    api = tweepy.API(
+        auth,
+        wait_on_rate_limit=True,
+        wait_on_rate_limit_notify=False,
+    )
+
+    # Optional: lightweight sanity check (can be commented out if you prefer)
+    try:
+        api.verify_credentials()
+    except Exception as e:
+        raise XClientConfigError(f"Failed to verify X credentials: {e}")
+
+    return api
 
 
-def attempt_post(text: str):
+def get_x_client() -> tweepy.API:
     """
-    Attempts to post a text tweet using the v1.1 API.
-    Raises exceptions on failure.
+    Return a singleton X client instance.
+
+    All posting should go through this function.
     """
-    client = get_x_client()
-    client.update_status(status=text)
+    global _client_cache
+
+    if _client_cache is not None:
+        return _client_cache
+
+    _client_cache = _create_client()
+    return _client_cache
